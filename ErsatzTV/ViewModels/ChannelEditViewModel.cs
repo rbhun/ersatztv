@@ -45,6 +45,7 @@ public class ChannelEditViewModel
     }
 
     public NextEngineTextSubtitleMode NextEngineTextSubtitleMode { get; set; }
+    public string NextEngineAudioLanguages { get; set; }
     public StreamingMode StreamingMode { get; set; }
     public int? WatermarkId { get; set; }
     public int? FallbackFillerId { get; set; }
@@ -88,6 +89,7 @@ public class ChannelEditViewModel
             PlayoutOffset,
             StreamingEngine,
             NextEngineTextSubtitleMode,
+            NextEngineAudioLanguages,
             StreamingMode,
             WatermarkId,
             FallbackFillerId,
@@ -122,6 +124,7 @@ public class ChannelEditViewModel
             PlayoutOffset,
             StreamingEngine,
             NextEngineTextSubtitleMode,
+            NextEngineAudioLanguages,
             StreamingMode,
             WatermarkId,
             FallbackFillerId,

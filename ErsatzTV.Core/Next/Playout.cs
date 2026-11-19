@@ -933,6 +933,16 @@ namespace ErsatzTV.Core.Next
         public TrackSelection? Audio { get; set; }
 
         /// <summary>
+        /// Audio tracks to output after the primary `audio` track, filling the channel's
+        /// `normalization.audio.tracks` slots in order. Each is read from the same source as the
+        /// primary audio track. Slots without an entry here are filled with silence, so every item
+        /// has the same track layout.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("extra_audio")]
+        public List<ExtraAudioTrack>? ExtraAudio { get; set; }
+
+        /// <summary>
         /// Subtitle track selection.
         /// </summary>
         [JsonPropertyName("subtitle")]
@@ -965,6 +975,19 @@ namespace ErsatzTV.Core.Next
         /// <summary>
         /// Zero-based stream index within the effective source. If omitted, the server picks the
         /// first stream of this track's kind.
+        /// </summary>
+        [JsonPropertyName("stream_index")]
+        public long? StreamIndex { get; set; }
+    }
+
+    /// <summary>
+    /// Fills one extra audio slot.
+    /// </summary>
+    public partial class ExtraAudioTrack
+    {
+        /// <summary>
+        /// Audio stream within the primary audio track's source. Omit it, or name a stream the
+        /// source doesn't have, to fill the slot with silence.
         /// </summary>
         [JsonPropertyName("stream_index")]
         public long? StreamIndex { get; set; }

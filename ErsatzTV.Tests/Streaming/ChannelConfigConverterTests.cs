@@ -37,6 +37,7 @@ public class ChannelConfigConverterTests
         PlayoutOffset: null,
         StreamingEngine: StreamingEngine.Next,
         NextEngineTextSubtitleMode: default,
+        NextEngineAudioLanguages: null!,
         StreamingMode: StreamingMode.HttpLiveStreamingSegmenter,
         WatermarkId: null,
         FallbackFillerId: null,
@@ -168,6 +169,28 @@ public class ChannelConfigConverterTests
             new EmptyConfigElementRepository());
 
         config.Session?.IdleTimeoutSeconds.ShouldBe(0);
+    }
+
+    [Test]
+    public async Task No_audio_languages_should_omit_tracks()
+    {
+        ChannelConfig config = await Convert(Profile);
+
+        config.Normalization.Audio.Tracks.ShouldBeNull();
+    }
+
+    [Test]
+    public async Task Audio_languages_should_become_ordered_titled_tracks()
+    {
+        ChannelConfig config = await Convert(
+            Channel with { NextEngineAudioLanguages = "eng,spa" },
+            Profile,
+            Option<FrameRate>.None,
+            new EmptyConfigElementRepository());
+
+        List<AudioTrack> tracks = config.Normalization.Audio.Tracks.ShouldNotBeNull();
+        tracks.Select(t => t.Language).ShouldBe(["eng", "spa"]);
+        tracks.Select(t => t.Title).ShouldBe(["English", "Spanish"]);
     }
 
     [TestCase(1, null)]

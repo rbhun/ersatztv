@@ -15,7 +15,7 @@ namespace ErsatzTV.Infrastructure.Sqlite.Migrations
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "9.0.15");
+            modelBuilder.HasAnnotation("ProductVersion", "9.0.23");
 
             modelBuilder.Entity("ErsatzTV.Core.Domain.Actor", b =>
                 {
@@ -317,6 +317,9 @@ namespace ErsatzTV.Infrastructure.Sqlite.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("varchar(50)")
                         .UseCollation("NOCASE");
+
+                    b.Property<string>("NextEngineAudioLanguages")
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("NextEngineTextSubtitleMode")
                         .HasColumnType("INTEGER");

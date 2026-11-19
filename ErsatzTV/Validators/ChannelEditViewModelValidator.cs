@@ -25,6 +25,11 @@ public class ChannelEditViewModelValidator : AbstractValidator<ChannelEditViewMo
                     .WithMessage("External logo url is invalid");
             });
 
+        RuleFor(x => x.NextEngineAudioLanguages)
+            .Must(languages => ChannelAudioLanguages.Parse(languages)
+                .All(l => l.Length == 3 && l.All(char.IsAsciiLetterLower)))
+            .WithMessage("Use three-letter language codes separated by commas, e.g. eng, spa");
+
         When(
             x => !x.IsEnabled,
             () =>

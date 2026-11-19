@@ -155,6 +155,33 @@ public class FFmpegStreamSelector : IFFmpegStreamSelector
         return DefaultSelectAudioStream(version.MediaVersion, allLanguageCodes, preferredAudioTitle, shouldLogMessages);
     }
 
+    // unlike SelectAudioStream, never falls back to a stream in another language
+    public Option<MediaStream> SelectAudioStreamForLanguage(
+        MediaVersion version,
+        string language,
+        bool shouldLogMessages)
+    {
+        List<string> allLanguageCodes = GetTwoAndThreeLetterLanguageCodes(
+            _languageCodeService.GetAllLanguageCodes([language.ToLowerInvariant()]));
+
+        var matching = version.Streams
+            .Filter(s => s.MediaStreamKind == MediaStreamKind.Audio)
+            .Filter(s => allLanguageCodes.Any(c => string.Equals(s.Language, c, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+        if (matching.Count == 0)
+        {
+            if (shouldLogMessages)
+            {
+                _logger.LogDebug("Unable to find audio stream with language code(s) {Code}", allLanguageCodes);
+            }
+
+            return None;
+        }
+
+        return PrioritizeDefault(matching, shouldLogMessages);
+    }
+
     public async Task<Option<Subtitle>> SelectSubtitleStream(
         ImmutableList<Subtitle> subtitles,
         Channel channel,

@@ -26,6 +26,7 @@ internal static class Mapper
             channel.PlayoutOffset,
             channel.StreamingEngine,
             channel.NextEngineTextSubtitleMode,
+            channel.NextEngineAudioLanguages,
             channel.StreamingMode,
             channel.WatermarkId,
             channel.FallbackFillerId,

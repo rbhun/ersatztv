@@ -37,7 +37,7 @@ public class PlayoutItemConverter(
     IDbContextFactory<TvContext> dbContextFactory,
     ILogger<PlayoutItemConverter> logger) : IPlayoutItemConverter
 {
-    public static readonly string PlayoutVersion = "https://ersatztv.org/playout/version/0.0.8";
+    public static readonly string PlayoutVersion = "https://ersatztv.org/playout/version/0.0.9";
 
     public async Task<Option<Core.Next.PlayoutItem>> ToNext(
         string channelNumber,
@@ -222,18 +222,24 @@ public class PlayoutItemConverter(
             foreach (Channel channel in maybeChannel)
             {
                 var audioVersion = new MediaItemAudioVersion(playoutItem.MediaItem, headVersion);
+
+                // the first channel audio language labels the primary track, so it must select it
+                List<string> audioLanguages = ChannelAudioLanguages.Parse(channel.NextEngineAudioLanguages);
                 await SelectTracks(
                     channel,
                     playoutItem,
                     audioVersion,
                     nextPlayoutItem,
-                    playoutItem.PreferredAudioLanguageCode ?? channel.PreferredAudioLanguageCode,
+                    audioLanguages.Count > 0
+                        ? audioLanguages[0]
+                        : playoutItem.PreferredAudioLanguageCode ?? channel.PreferredAudioLanguageCode,
                     playoutItem.PreferredAudioTitle ?? channel.PreferredAudioTitle,
                     playoutItem.PreferredSubtitleLanguageCode ?? channel.PreferredSubtitleLanguageCode,
                     playoutItem.SubtitleMode ?? channel.SubtitleMode,
                     subtitles,
                     shouldLogMessages,
                     cancellationToken);
+                SelectExtraAudio(audioLanguages, headVersion, nextPlayoutItem, shouldLogMessages);
                 SelectGraphics(
                     maybeGlobalWatermark,
                     channel,
@@ -613,6 +619,37 @@ public class PlayoutItemConverter(
                 nextPlayoutItem.Tracks.Subtitle = new Core.Next.TrackSelection { Source = source };
             }
         }
+    }
+
+    // next fills a slot without a stream with silence; repeating the primary stream keeps
+    // the item audible on every track
+    private void SelectExtraAudio(
+        List<string> audioLanguages,
+        MediaVersion headVersion,
+        Core.Next.PlayoutItem nextPlayoutItem,
+        bool shouldLogMessages)
+    {
+        if (audioLanguages.Count < 2)
+        {
+            return;
+        }
+
+        long? primaryIndex = nextPlayoutItem.Tracks?.Audio?.StreamIndex;
+        if (primaryIndex is null)
+        {
+            return;
+        }
+
+        nextPlayoutItem.Tracks.ExtraAudio = audioLanguages
+            .Skip(1)
+            .Select(language => new Core.Next.ExtraAudioTrack
+            {
+                StreamIndex = ffmpegStreamSelector
+                    .SelectAudioStreamForLanguage(headVersion, language, shouldLogMessages)
+                    .Map(s => (long)s.Index)
+                    .IfNone(primaryIndex.Value)
+            })
+            .ToList();
     }
 
     private Option<Core.Next.Source> SubtitleSource(

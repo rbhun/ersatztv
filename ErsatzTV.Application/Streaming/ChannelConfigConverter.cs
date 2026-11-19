@@ -16,7 +16,7 @@ namespace ErsatzTV.Application.Streaming;
 public class ChannelConfigConverter(IConfigElementRepository configElementRepository, IFileSystem fileSystem)
     : IChannelConfigConverter
 {
-    public static readonly string ChannelConfigVersion = "https://ersatztv.org/channel/version/0.1.5";
+    public static readonly string ChannelConfigVersion = "https://ersatztv.org/channel/version/0.1.6";
 
     public async Task<ChannelConfig> ToNext(
         ChannelViewModel channel,
@@ -69,6 +69,14 @@ public class ChannelConfigConverter(IConfigElementRepository configElementReposi
             Channels = ffmpegProfile.AudioChannels,
             SampleRateHz = ffmpegProfile.AudioSampleRate * 1000
         };
+
+        List<string> audioLanguages = ChannelAudioLanguages.Parse(channel.NextEngineAudioLanguages);
+        if (audioLanguages.Count > 0)
+        {
+            audioNormalization.Tracks = audioLanguages
+                .Select(language => new AudioTrack { Language = language, Title = LanguageTitle(language) })
+                .ToList();
+        }
 
         // next rejects loudness normalization with audio copy
         if (!audioCopy && ffmpegProfile.NormalizeLoudnessMode is NormalizeLoudnessMode.LoudNorm)
@@ -212,6 +220,12 @@ public class ChannelConfigConverter(IConfigElementRepository configElementReposi
             ? custom
             : fileSystem.Path.Combine(FileSystemLayout.ResourcesCacheFolder, "_background.png");
     }
+
+    private static string LanguageTitle(string threeLetterCode) =>
+        CultureInfo.GetCultures(CultureTypes.NeutralCultures)
+            .Where(c => string.Equals(c.ThreeLetterISOLanguageName, threeLetterCode, StringComparison.OrdinalIgnoreCase))
+            .Select(c => c.EnglishName)
+            .FirstOrDefault() ?? threeLetterCode;
 
     private const int MaxNextFrameRate = 240;
 

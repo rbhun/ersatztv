@@ -23,6 +23,7 @@ public record ChannelViewModel(
     TimeSpan? PlayoutOffset,
     StreamingEngine StreamingEngine,
     NextEngineTextSubtitleMode NextEngineTextSubtitleMode,
+    string NextEngineAudioLanguages,
     StreamingMode StreamingMode,
     int? WatermarkId,
     int? FallbackFillerId,

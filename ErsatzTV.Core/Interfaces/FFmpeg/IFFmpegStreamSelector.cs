@@ -17,6 +17,11 @@ public interface IFFmpegStreamSelector
         bool shouldLogMessages,
         CancellationToken cancellationToken);
 
+    Option<MediaStream> SelectAudioStreamForLanguage(
+        MediaVersion version,
+        string language,
+        bool shouldLogMessages);
+
     Task<Option<Subtitle>> SelectSubtitleStream(
         ImmutableList<Subtitle> subtitles,
         Channel channel,

@@ -1197,6 +1197,11 @@ public class TranscodingTests
             Optional(version.MediaVersion.Streams.FirstOrDefault(s => s.MediaStreamKind == MediaStreamKind.Audio))
                 .AsTask();
 
+        public Option<MediaStream> SelectAudioStreamForLanguage(
+            MediaVersion version,
+            string language,
+            bool shouldLogMessages) => None;
+
         public Task<Option<ErsatzTV.Core.Domain.Subtitle>> SelectSubtitleStream(
             ImmutableList<ErsatzTV.Core.Domain.Subtitle> subtitles,
             Channel channel,

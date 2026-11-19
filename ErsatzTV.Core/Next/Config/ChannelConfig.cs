@@ -256,6 +256,15 @@ namespace ErsatzTV.Core.Next.Config
         /// </summary>
         [JsonPropertyName("sample_rate_hz")]
         public long? SampleRateHz { get; set; }
+
+        /// <summary>
+        /// Audio tracks to output, in order. The first entry describes the primary track; each
+        /// further entry adds a track filled from the playout item's `tracks.extra_audio`, or with
+        /// silence, so every item has the same layout. Empty outputs one untagged track.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("tracks")]
+        public List<AudioTrack>? Tracks { get; set; }
     }
 
     public partial class LoudnessClass
@@ -277,6 +286,21 @@ namespace ErsatzTV.Core.Next.Config
         /// </summary>
         [JsonPropertyName("true_peak")]
         public double? TruePeak { get; set; }
+    }
+
+    public partial class AudioTrack
+    {
+        /// <summary>
+        /// Language tag for the track, e.g. `eng`.
+        /// </summary>
+        [JsonPropertyName("language")]
+        public string? Language { get; set; }
+
+        /// <summary>
+        /// Track title shown in players, e.g. `English`.
+        /// </summary>
+        [JsonPropertyName("title")]
+        public string? Title { get; set; }
     }
 
     /// <summary>

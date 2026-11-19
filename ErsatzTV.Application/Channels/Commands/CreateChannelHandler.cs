@@ -87,6 +87,7 @@ public class CreateChannelHandler(
                 PlayoutOffset = request.PlayoutOffset,
                 StreamingEngine = StreamingEngine.Next,
                 NextEngineTextSubtitleMode = request.NextEngineTextSubtitleMode,
+                NextEngineAudioLanguages = ChannelAudioLanguages.Normalize(request.NextEngineAudioLanguages),
                 StreamingMode = request.StreamingMode,
                 Artwork = artwork,
                 StreamSelectorMode = request.StreamSelectorMode,

@@ -142,6 +142,15 @@ else
 </MudStack>
 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
     <div class="d-flex">
+        <MudText>Audio Track Languages</MudText>
+    </div>
+    <MudTextField @bind-Value="_model.NextEngineAudioLanguages"
+                  For="@(() => _model.NextEngineAudioLanguages)"
+                  Placeholder="eng, spa"
+                  HelperText="Three-letter language codes, one output audio track each. The first is the main track and replaces the preferred audio language. Items without a language get the main track's audio in that slot."/>
+</MudStack>
+<MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+    <div class="d-flex">
         <MudText>Streaming Mode</MudText>
     </div>
     <MudSelect @bind-Value="_model.StreamingMode" For="@(() => _model.StreamingMode)">
@@ -400,6 +409,7 @@ else
                         _model.PlayoutOffset = channelViewModel.PlayoutOffset;
                         _model.StreamingEngine = StreamingEngine.Next;
                         _model.NextEngineTextSubtitleMode = channelViewModel.NextEngineTextSubtitleMode;
+                        _model.NextEngineAudioLanguages = channelViewModel.NextEngineAudioLanguages;
                         _model.StreamingMode = channelViewModel.StreamingMode;
                         _model.StreamSelectorMode = channelViewModel.StreamSelectorMode;
                         _model.StreamSelector = channelViewModel.StreamSelector;

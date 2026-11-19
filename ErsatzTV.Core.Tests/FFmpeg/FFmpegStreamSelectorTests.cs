@@ -16,6 +16,52 @@ namespace ErsatzTV.Core.Tests.FFmpeg;
 public class FFmpegStreamSelectorTests
 {
     [TestFixture]
+    public class SelectAudioStreamForLanguage
+    {
+        private static readonly MediaVersion Version = new()
+        {
+            Streams =
+            [
+                new MediaStream { Index = 1, MediaStreamKind = MediaStreamKind.Audio, Channels = 2, Language = "en" },
+                new MediaStream { Index = 2, MediaStreamKind = MediaStreamKind.Audio, Channels = 2, Language = "spa" },
+                new MediaStream
+                {
+                    Index = 3, MediaStreamKind = MediaStreamKind.Audio, Channels = 6, Language = "spa", Default = true
+                },
+                new MediaStream { Index = 4, MediaStreamKind = MediaStreamKind.Subtitle, Language = "fra" }
+            ]
+        };
+
+        private static FFmpegStreamSelector Selector(params string[] codes)
+        {
+            ILanguageCodeService languageCodeService = Substitute.For<ILanguageCodeService>();
+            languageCodeService.GetAllLanguageCodes(Arg.Any<List<string>>()).Returns(codes.ToList());
+
+            return new FFmpegStreamSelector(
+                new ScriptEngine(Substitute.For<ILogger<ScriptEngine>>()),
+                Substitute.For<IStreamSelectorRepository>(),
+                Substitute.For<IConfigElementRepository>(),
+                new MockFileSystem(),
+                languageCodeService,
+                Substitute.For<ILogger<FFmpegStreamSelector>>());
+        }
+
+        [Test]
+        public void Should_Match_Two_Letter_Stream_Language() =>
+            Selector("eng").SelectAudioStreamForLanguage(Version, "eng", false)
+                .Map(s => s.Index).ShouldBe(Some(1));
+
+        [Test]
+        public void Should_Prefer_Default_Stream() =>
+            Selector("spa").SelectAudioStreamForLanguage(Version, "spa", false)
+                .Map(s => s.Index).ShouldBe(Some(3));
+
+        [Test]
+        public void Should_Not_Fall_Back_To_Another_Language() =>
+            Selector("fra").SelectAudioStreamForLanguage(Version, "fra", false).IsNone.ShouldBeTrue();
+    }
+
+    [TestFixture]
     public class SelectAudioStream
     {
         [Test]
