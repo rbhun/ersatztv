@@ -2,6 +2,7 @@
 using ErsatzTV.Core.Interfaces.Emby;
 using ErsatzTV.Core.Interfaces.Jellyfin;
 using ErsatzTV.Core.Interfaces.Plex;
+using ErsatzTV.Core.Scheduling;
 
 namespace ErsatzTV.Core.Extensions;
 
@@ -45,6 +46,54 @@ public static class MediaItemExtensions
             }
 
             return version.Duration;
+        }
+
+        public TimeSpan GetDurationForPlayout(EndCreditsTrim endCreditsTrim)
+        {
+            TimeSpan duration = mediaItem.GetDurationForPlayout();
+            return mediaItem.GetEndCreditsCutoff(endCreditsTrim, duration) ?? duration;
+        }
+
+        public List<MediaChapter> GetChaptersForPlayout(EndCreditsTrim endCreditsTrim)
+        {
+            MediaVersion version = mediaItem.GetHeadVersion();
+            var chapters = Optional(version.Chapters).Flatten().OrderBy(c => c.StartTime).ToList();
+
+            if (mediaItem.GetEndCreditsCutoff(endCreditsTrim, version.Duration) is not { } cutoff)
+            {
+                return chapters;
+            }
+
+            // copy so the media item's own chapters keep their times for other channels
+            return chapters
+                .Filter(c => c.StartTime < cutoff)
+                .Map(c => new MediaChapter
+                {
+                    Id = c.Id,
+                    MediaVersionId = c.MediaVersionId,
+                    ChapterId = c.ChapterId,
+                    StartTime = c.StartTime,
+                    EndTime = c.EndTime < cutoff ? c.EndTime : cutoff,
+                    Title = c.Title
+                })
+                .ToList();
+        }
+
+        private TimeSpan? GetEndCreditsCutoff(EndCreditsTrim endCreditsTrim, TimeSpan duration)
+        {
+            if (endCreditsTrim is null || mediaItem is ChapterMediaItem or Image or RemoteStream)
+            {
+                return null;
+            }
+
+            TimeSpan? creditsStart = mediaItem.GetHeadVersion().CreditsStart;
+            if (creditsStart is not { } start || start <= TimeSpan.Zero)
+            {
+                return null;
+            }
+
+            TimeSpan cutoff = start + endCreditsTrim.Keep;
+            return cutoff < duration ? cutoff : null;
         }
 
         public MediaVersion GetHeadVersion() =>

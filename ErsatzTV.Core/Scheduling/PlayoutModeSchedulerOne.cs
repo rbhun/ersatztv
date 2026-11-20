@@ -34,8 +34,8 @@ public class PlayoutModeSchedulerOne(ILogger logger) : PlayoutModeSchedulerBase<
                 break;
             }
 
-            TimeSpan itemDuration = mediaItem.GetDurationForPlayout();
-            List<MediaChapter> itemChapters = ChaptersForMediaItem(mediaItem);
+            TimeSpan itemDuration = mediaItem.GetDurationForPlayout(playoutBuilderState.EndCreditsTrim);
+            List<MediaChapter> itemChapters = ChaptersForMediaItem(mediaItem, playoutBuilderState.EndCreditsTrim);
 
             var playoutItem = new PlayoutItem
             {

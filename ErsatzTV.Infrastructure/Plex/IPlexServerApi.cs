@@ -115,7 +115,7 @@ public interface IPlexServerApi
             [Query]
             NetworkFilter filter);
 
-    [Get("/library/metadata/{key}?includeChapters=1")]
+    [Get("/library/metadata/{key}?includeChapters=1&includeMarkers=1")]
     [Headers("Accept: text/xml")]
     Task<PlexXmlVideoMetadataResponseContainer>
         GetVideoMetadata(

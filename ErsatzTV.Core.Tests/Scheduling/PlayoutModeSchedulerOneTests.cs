@@ -869,6 +869,73 @@ public class PlayoutModeSchedulerOneTests : SchedulerTestBase
         enumerator.State.Index.ShouldBe(0);
     }
 
+    [TestCase(true, 0, 50)]
+    [TestCase(true, 120, 52)]
+    [TestCase(false, 0, 60)]
+    public void Should_End_Item_At_Credits_When_Skipping_End_Credits(
+        bool skipEndCredits,
+        int keepSeconds,
+        int expectedMinutes)
+    {
+        var movie = new Movie
+        {
+            Id = 1,
+            MovieMetadata = [new MovieMetadata { ReleaseDate = new DateTime(2020, 1, 1) }],
+            MediaVersions =
+            [
+                new MediaVersion
+                {
+                    Duration = TimeSpan.FromHours(1),
+                    CreditsStart = TimeSpan.FromMinutes(50),
+                    Chapters = []
+                }
+            ]
+        };
+
+        var collection = new Collection { Id = 1, Name = "Credits", MediaItems = [movie] };
+
+        var scheduleItem = new ProgramScheduleItemOne
+        {
+            Id = 1,
+            Index = 1,
+            Collection = collection,
+            CollectionId = collection.Id,
+            StartTime = null,
+            PlaybackOrder = PlaybackOrder.Chronological
+        };
+
+        var scheduleItemsEnumerator = new OrderedScheduleItemsEnumerator(
+            new List<ProgramScheduleItem> { scheduleItem },
+            new CollectionEnumeratorState());
+
+        var enumerator = new ChronologicalMediaCollectionEnumerator(
+            collection.MediaItems,
+            new CollectionEnumeratorState());
+
+        PlayoutBuilderState startState = StartState(scheduleItemsEnumerator) with
+        {
+            EndCreditsTrim = EndCreditsTrim.ForChannel(
+                new Channel(Guid.Empty) { SkipEndCredits = skipEndCredits, EndCreditsKeepSeconds = keepSeconds })
+        };
+
+        var scheduler = new PlayoutModeSchedulerOne(Substitute.For<ILogger>());
+        (PlayoutBuilderState playoutBuilderState, List<PlayoutItem> playoutItems, PlayoutBuildWarnings _) =
+            scheduler.Schedule(
+                startState,
+                CollectionEnumerators(scheduleItem, enumerator),
+                scheduleItem,
+                NextScheduleItem,
+                HardStop(scheduleItemsEnumerator),
+                _random,
+                _cancellationToken);
+
+        playoutItems.Count.ShouldBe(1);
+        playoutItems[0].InPoint.ShouldBe(TimeSpan.Zero);
+        playoutItems[0].OutPoint.ShouldBe(TimeSpan.FromMinutes(expectedMinutes));
+        playoutItems[0].FinishOffset.ShouldBe(startState.CurrentTime.AddMinutes(expectedMinutes));
+        playoutBuilderState.CurrentTime.ShouldBe(startState.CurrentTime.AddMinutes(expectedMinutes));
+    }
+
     protected override ProgramScheduleItem NextScheduleItem => new ProgramScheduleItemOne
     {
         StartTime = TimeSpan.FromHours(3)

@@ -81,4 +81,7 @@ public class PlexMetadataResponse
 
     [XmlElement("Chapter")]
     public List<PlexChapterResponse> Chapters { get; set; }
+
+    [XmlElement("Marker")]
+    public List<PlexMarkerResponse> Markers { get; set; }
 }

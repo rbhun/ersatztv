@@ -75,8 +75,8 @@ public class PlayoutModeSchedulerDuration(ILogger logger)
 
             durationUntil = nextState.DurationFinish;
 
-            TimeSpan itemDuration = mediaItem.GetDurationForPlayout();
-            List<MediaChapter> itemChapters = ChaptersForMediaItem(mediaItem);
+            TimeSpan itemDuration = mediaItem.GetDurationForPlayout(playoutBuilderState.EndCreditsTrim);
+            List<MediaChapter> itemChapters = ChaptersForMediaItem(mediaItem, playoutBuilderState.EndCreditsTrim);
 
             if (itemDuration > scheduleItem.PlayoutDuration)
             {

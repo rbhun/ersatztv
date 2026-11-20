@@ -47,6 +47,8 @@ public class ChannelConfigConverterTests
         MusicVideoCreditsMode: default,
         MusicVideoCreditsTemplate: null!,
         SongVideoMode: default,
+        SkipEndCredits: false,
+        EndCreditsKeepSeconds: 0,
         TranscodeMode: default,
         IdleBehavior: default,
         IsEnabled: true,

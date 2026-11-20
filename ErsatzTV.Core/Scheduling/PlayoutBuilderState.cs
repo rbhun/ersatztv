@@ -12,6 +12,8 @@ public record PlayoutBuilderState(
     int NextGuideGroup,
     DateTimeOffset CurrentTime)
 {
+    public EndCreditsTrim EndCreditsTrim { get; init; }
+
     public int IncrementGuideGroup => (NextGuideGroup + 1) % 10000;
     public int DecrementGuideGroup => (NextGuideGroup - 1) % 10000;
 }

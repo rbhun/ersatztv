@@ -111,7 +111,7 @@ public class YamlPlayoutDurationHandler(EnumeratorCache enumeratorCache) : YamlP
 
             foreach (MediaItem mediaItem in enumerator.Current)
             {
-                TimeSpan itemDuration = mediaItem.GetDurationForPlayout();
+                TimeSpan itemDuration = mediaItem.GetDurationForPlayout(EndCreditsTrimFor(fillerKind, context));
 
                 var playoutItem = new PlayoutItem
                 {

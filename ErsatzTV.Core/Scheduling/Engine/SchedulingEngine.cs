@@ -740,7 +740,7 @@ public class SchedulingEngine(
 
             foreach (MediaItem mediaItem in enumeratorDetails.Enumerator.Current)
             {
-                TimeSpan itemDuration = mediaItem.GetDurationForPlayout();
+                TimeSpan itemDuration = mediaItem.GetDurationForPlayout(EndCreditsTrimFor(fillerKind));
 
                 var playoutItem = new PlayoutItem
                 {
@@ -935,7 +935,7 @@ public class SchedulingEngine(
 
             foreach (MediaItem mediaItem in enumeratorDetails.Enumerator.Current)
             {
-                TimeSpan itemDuration = mediaItem.GetDurationForPlayout();
+                TimeSpan itemDuration = mediaItem.GetDurationForPlayout(EndCreditsTrimFor(GetFillerKind(fillerKind)));
 
                 // create a playout item
                 var playoutItem = new PlayoutItem
@@ -1492,6 +1492,11 @@ public class SchedulingEngine(
 
         return FillerKind.None;
     }
+
+    private EndCreditsTrim EndCreditsTrimFor(FillerKind fillerKind) =>
+        fillerKind is FillerKind.None && _referenceData?.Channel is { } channel
+            ? EndCreditsTrim.ForChannel(channel)
+            : null;
 
     private async Task<Option<GraphicsElement>> GetGraphicsElementByPath(
         string path,

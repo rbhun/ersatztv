@@ -51,6 +51,8 @@ public class BlockPlayoutBuilder(
             referenceData.Channel.Number,
             referenceData.Channel.Name);
 
+        EndCreditsTrim endCreditsTrim = EndCreditsTrim.ForChannel(referenceData.Channel);
+
         List<PlaybackOrder> allowedPlaybackOrders =
         [
             PlaybackOrder.Chronological,
@@ -218,7 +220,7 @@ public class BlockPlayoutBuilder(
                             mediaItem.Id,
                             PlayoutBuilder.DisplayTitle(mediaItem));
 
-                        TimeSpan itemDuration = mediaItem.GetDurationForPlayout();
+                        TimeSpan itemDuration = mediaItem.GetDurationForPlayout(endCreditsTrim);
 
                         // item will never fit in block
                         var blockDuration = TimeSpan.FromMinutes(effectiveBlock.Block.Minutes);
@@ -228,7 +230,7 @@ public class BlockPlayoutBuilder(
                             // enumerator.MinimumDuration is none for images and remote streams, which
                             // would skip forever, so use the same duration source as the check above
                             TimeSpan minimumDuration = collectionMediaItems[CollectionKey.ForBlockItem(blockItem)]
-                                .Map(i => i.GetDurationForPlayout())
+                                .Map(i => i.GetDurationForPlayout(endCreditsTrim))
                                 .OrderBy(identity)
                                 .Head();
 

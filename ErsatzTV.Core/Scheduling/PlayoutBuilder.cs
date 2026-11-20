@@ -757,7 +757,10 @@ public class PlayoutBuilder : IPlayoutBuilder
             startAnchor.InFlood,
             startAnchor.InDurationFiller,
             startAnchor.NextGuideGroup,
-            currentTime);
+            currentTime)
+        {
+            EndCreditsTrim = EndCreditsTrim.ForChannel(referenceData.Channel)
+        };
 
         var schedulerOne = new PlayoutModeSchedulerOne(_logger);
         var schedulerMultiple = new PlayoutModeSchedulerMultiple(collectionItemCount.ToMap(), _logger);

@@ -296,11 +296,8 @@ public abstract class PlayoutModeSchedulerBase<T>(ILogger logger) : IPlayoutMode
             _ => null
         };
 
-    protected static List<MediaChapter> ChaptersForMediaItem(MediaItem mediaItem)
-    {
-        MediaVersion version = mediaItem.GetHeadVersion();
-        return Optional(version.Chapters).Flatten().OrderBy(c => c.StartTime).ToList();
-    }
+    protected static List<MediaChapter> ChaptersForMediaItem(MediaItem mediaItem, EndCreditsTrim endCreditsTrim) =>
+        mediaItem.GetChaptersForPlayout(endCreditsTrim);
 
     protected void LogScheduledItem(
         ProgramScheduleItem scheduleItem,

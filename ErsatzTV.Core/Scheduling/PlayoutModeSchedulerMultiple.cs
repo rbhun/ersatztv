@@ -85,8 +85,8 @@ public class PlayoutModeSchedulerMultiple(Map<CollectionKey, int> collectionItem
             // find when we should start this item, based on the current time
             DateTimeOffset itemStartTime = GetStartTimeAfter(nextState, scheduleItem, Option<ILogger>.Some(Logger));
 
-            TimeSpan itemDuration = mediaItem.GetDurationForPlayout();
-            List<MediaChapter> itemChapters = ChaptersForMediaItem(mediaItem);
+            TimeSpan itemDuration = mediaItem.GetDurationForPlayout(playoutBuilderState.EndCreditsTrim);
+            List<MediaChapter> itemChapters = ChaptersForMediaItem(mediaItem, playoutBuilderState.EndCreditsTrim);
 
             var playoutItem = new PlayoutItem
             {

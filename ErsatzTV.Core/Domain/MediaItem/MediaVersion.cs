@@ -10,6 +10,7 @@ public class MediaVersion : IDisplaySize
     public List<MediaStream> Streams { get; set; }
     public List<MediaChapter> Chapters { get; set; }
     public TimeSpan Duration { get; set; }
+    public TimeSpan? CreditsStart { get; set; }
     public string SampleAspectRatio { get; set; }
     public string DisplayAspectRatio { get; set; }
     public string RFrameRate { get; set; }

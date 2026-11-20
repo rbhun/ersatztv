@@ -36,6 +36,8 @@ internal static class Mapper
             channel.MusicVideoCreditsMode,
             channel.MusicVideoCreditsTemplate,
             channel.SongVideoMode,
+            channel.SkipEndCredits,
+            channel.EndCreditsKeepSeconds,
             channel.TranscodeMode,
             channel.IdleBehavior,
             channel.IsEnabled,

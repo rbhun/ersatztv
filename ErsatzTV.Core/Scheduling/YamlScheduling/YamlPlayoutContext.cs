@@ -49,6 +49,8 @@ public class YamlPlayoutContext(Playout playout, YamlPlayoutDefinition definitio
 
     public DateTimeOffset CurrentTime { get; set; }
 
+    public EndCreditsTrim EndCreditsTrim { get; init; }
+
     public int InstructionIndex
     {
         get => _instructionIndex;

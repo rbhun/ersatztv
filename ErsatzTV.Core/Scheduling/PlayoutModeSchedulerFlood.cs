@@ -44,7 +44,7 @@ public class PlayoutModeSchedulerFlood(ILogger logger) : PlayoutModeSchedulerBas
                 break;
             }
 
-            TimeSpan itemDuration = mediaItem.GetDurationForPlayout();
+            TimeSpan itemDuration = mediaItem.GetDurationForPlayout(playoutBuilderState.EndCreditsTrim);
 
             // never block scheduling when there is only one schedule item (with fixed start and flood)
             DateTimeOffset peekScheduleItemStart =
@@ -59,7 +59,7 @@ public class PlayoutModeSchedulerFlood(ILogger logger) : PlayoutModeSchedulerBas
                     : hardStop - itemStartTime;
             }
 
-            List<MediaChapter> itemChapters = ChaptersForMediaItem(mediaItem);
+            List<MediaChapter> itemChapters = ChaptersForMediaItem(mediaItem, playoutBuilderState.EndCreditsTrim);
 
             var playoutItem = new PlayoutItem
             {

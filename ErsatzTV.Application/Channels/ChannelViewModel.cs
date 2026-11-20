@@ -33,6 +33,8 @@ public record ChannelViewModel(
     ChannelMusicVideoCreditsMode MusicVideoCreditsMode,
     string MusicVideoCreditsTemplate,
     ChannelSongVideoMode SongVideoMode,
+    bool SkipEndCredits,
+    int EndCreditsKeepSeconds,
     ChannelTranscodeMode TranscodeMode,
     ChannelIdleBehavior IdleBehavior,
     bool IsEnabled,

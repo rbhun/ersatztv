@@ -46,7 +46,8 @@ public class YamlPlayoutCountHandler(EnumeratorCache enumeratorCache) : YamlPlay
 
                 foreach (MediaItem mediaItem in enumerator.Current)
                 {
-                    TimeSpan itemDuration = mediaItem.GetDurationForPlayout();
+                    TimeSpan itemDuration = mediaItem.GetDurationForPlayout(
+                        EndCreditsTrimFor(GetFillerKind(count, context), context));
 
                     // create a playout item
                     var playoutItem = new PlayoutItem

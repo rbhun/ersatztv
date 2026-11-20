@@ -277,6 +277,27 @@ else
 </MudStack>
 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
     <div class="d-flex">
+        <MudText>Skip End Credits</MudText>
+    </div>
+    <MudCheckBox @bind-Value="_model.SkipEndCredits"
+                 For="@(() => _model.SkipEndCredits)"
+                 Dense="true"
+                 Label="End programs where Plex detected final credits; takes effect on the next playout build"/>
+</MudStack>
+<MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+    <div class="d-flex">
+        <MudText>Keep End Credits</MudText>
+    </div>
+    <MudTextField T="int"
+                  @bind-Value="_model.EndCreditsKeepSeconds"
+                  For="@(() => _model.EndCreditsKeepSeconds)"
+                  Disabled="@(!_model.SkipEndCredits)"
+                  Adornment="Adornment.End"
+                  AdornmentText="seconds"
+                  HelperText="How much of the final credits to play before cutting to the next item"/>
+</MudStack>
+<MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+    <div class="d-flex">
         <MudText>Logo</MudText>
     </div>
     <InputFile id="fileInput" OnChange="@UploadLogo" style="display: none;"/>
@@ -422,6 +443,8 @@ else
                         _model.MusicVideoCreditsMode = channelViewModel.MusicVideoCreditsMode;
                         _model.MusicVideoCreditsTemplate = channelViewModel.MusicVideoCreditsTemplate;
                         _model.SongVideoMode = channelViewModel.SongVideoMode;
+                        _model.SkipEndCredits = channelViewModel.SkipEndCredits;
+                        _model.EndCreditsKeepSeconds = channelViewModel.EndCreditsKeepSeconds;
                         _model.TranscodeMode = channelViewModel.TranscodeMode;
                         _model.IdleBehavior = channelViewModel.IdleBehavior;
                         _model.IsEnabled = channelViewModel.IsEnabled;

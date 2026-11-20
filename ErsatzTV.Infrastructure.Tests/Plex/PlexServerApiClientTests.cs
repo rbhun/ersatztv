@@ -1,4 +1,6 @@
+using System.Xml.Serialization;
 using ErsatzTV.Infrastructure.Plex;
+using ErsatzTV.Infrastructure.Plex.Models;
 using NUnit.Framework;
 using Shouldly;
 
@@ -45,5 +47,44 @@ public class PlexServerApiClientTests
                 "/media/other-extra/Travel/clip.mkv",
                 ["", "/media/other", "/media/other-extra", "/media/other-extra/Travel"])
             .ShouldBe(["other-extra", "Travel"]);
+    }
+
+    [Test]
+    public void CreditsStart_Should_Use_Final_Credits_Marker()
+    {
+        PlexXmlVideoMetadataResponseContainer response = DeserializeVideo(
+            """
+            <MediaContainer size="1">
+              <Video ratingKey="1" key="/library/metadata/1" type="episode" title="Pilot">
+                <Marker id="1" type="intro" startTimeOffset="0" endTimeOffset="45000" />
+                <Marker id="2" type="credits" startTimeOffset="60000" endTimeOffset="90000" />
+                <Marker id="3" type="credits" startTimeOffset="1260000" endTimeOffset="1320000" final="1" />
+              </Video>
+            </MediaContainer>
+            """);
+
+        PlexServerApiClient.GetCreditsStart(response.Metadata).ShouldBe(TimeSpan.FromMinutes(21));
+    }
+
+    [Test]
+    public void CreditsStart_Should_Be_Null_Without_Final_Credits_Marker()
+    {
+        PlexXmlVideoMetadataResponseContainer response = DeserializeVideo(
+            """
+            <MediaContainer size="1">
+              <Video ratingKey="1" key="/library/metadata/1" type="episode" title="Pilot">
+                <Marker id="2" type="credits" startTimeOffset="60000" endTimeOffset="90000" />
+              </Video>
+            </MediaContainer>
+            """);
+
+        PlexServerApiClient.GetCreditsStart(response.Metadata).ShouldBeNull();
+    }
+
+    private static PlexXmlVideoMetadataResponseContainer DeserializeVideo(string xml)
+    {
+        var serializer = new XmlSerializer(typeof(PlexXmlVideoMetadataResponseContainer));
+        using var reader = new StringReader(xml);
+        return (PlexXmlVideoMetadataResponseContainer)serializer.Deserialize(reader)!;
     }
 }

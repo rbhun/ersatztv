@@ -118,7 +118,8 @@ public class SequentialPlayoutBuilder(
 
         var context = new YamlPlayoutContext(playout, playoutDefinition, 1)
         {
-            CurrentTime = start
+            CurrentTime = start,
+            EndCreditsTrim = EndCreditsTrim.ForChannel(referenceData.Channel)
 
             // no need to init default value and throw off visited count
             // InstructionIndex = 0

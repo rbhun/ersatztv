@@ -155,11 +155,8 @@ public abstract class YamlPlayoutContentHandler(EnumeratorCache enumeratorCache)
         return FillerKind.None;
     }
 
-    protected static List<MediaChapter> ChaptersForMediaItem(MediaItem mediaItem)
-    {
-        MediaVersion version = mediaItem.GetHeadVersion();
-        return Optional(version.Chapters).Flatten().OrderBy(c => c.StartTime).ToList();
-    }
+    protected static EndCreditsTrim EndCreditsTrimFor(FillerKind fillerKind, YamlPlayoutContext context) =>
+        fillerKind is FillerKind.None ? context.EndCreditsTrim : null;
 
     protected static async Task AddItemAndMidRoll(
         YamlPlayoutContext context,
@@ -168,7 +165,8 @@ public abstract class YamlPlayoutContentHandler(EnumeratorCache enumeratorCache)
         Func<string, Task> executeSequence,
         ILogger logger)
     {
-        List<MediaChapter> itemChapters = ChaptersForMediaItem(mediaItem);
+        List<MediaChapter> itemChapters = mediaItem.GetChaptersForPlayout(
+            EndCreditsTrimFor(playoutItem.FillerKind, context));
         Option<YamlPlayoutContext.MidRollSequence> maybeMidRollSequence = context.GetMidRollSequence();
         if (itemChapters.Count < 2 || maybeMidRollSequence.IsNone)
         {

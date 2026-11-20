@@ -133,6 +133,7 @@ public class MetadataRepository(IDbContextFactory<TvContext> dbContextFactory) :
                 {
                     existing.DateUpdated = incoming.DateUpdated;
                     existing.Duration = incoming.Duration;
+                    existing.CreditsStart = incoming.CreditsStart;
                     existing.SampleAspectRatio = incoming.SampleAspectRatio;
                     existing.DisplayAspectRatio = incoming.DisplayAspectRatio;
                     existing.Width = incoming.Width;

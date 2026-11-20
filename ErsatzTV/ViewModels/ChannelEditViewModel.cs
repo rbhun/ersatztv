@@ -62,6 +62,8 @@ public class ChannelEditViewModel
     }
 
     public ChannelSongVideoMode SongVideoMode { get; set; }
+    public bool SkipEndCredits { get; set; }
+    public int EndCreditsKeepSeconds { get; set; }
     public ChannelTranscodeMode TranscodeMode { get; set; }
     public ChannelIdleBehavior IdleBehavior { get; set; }
     public bool IsEnabled { get; set; }
@@ -98,6 +100,8 @@ public class ChannelEditViewModel
             MusicVideoCreditsMode,
             MusicVideoCreditsTemplate,
             SongVideoMode,
+            SkipEndCredits,
+            EndCreditsKeepSeconds,
             TranscodeMode,
             IdleBehavior,
             IsEnabled,
@@ -133,6 +137,8 @@ public class ChannelEditViewModel
             MusicVideoCreditsMode,
             MusicVideoCreditsTemplate,
             SongVideoMode,
+            SkipEndCredits,
+            EndCreditsKeepSeconds,
             TranscodeMode,
             IdleBehavior,
             IsEnabled,

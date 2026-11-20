@@ -297,6 +297,9 @@ namespace ErsatzTV.Infrastructure.MySql.Migrations
                     b.Property<string>("Categories")
                         .HasColumnType("longtext");
 
+                    b.Property<int>("EndCreditsKeepSeconds")
+                        .HasColumnType("int");
+
                     b.Property<int>("FFmpegProfileId")
                         .HasColumnType("int");
 
@@ -362,6 +365,9 @@ namespace ErsatzTV.Infrastructure.MySql.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("tinyint(1)")
                         .HasDefaultValue(true);
+
+                    b.Property<bool>("SkipEndCredits")
+                        .HasColumnType("tinyint(1)");
 
                     b.Property<double?>("SlugSeconds")
                         .HasColumnType("double");
@@ -1446,6 +1452,9 @@ namespace ErsatzTV.Infrastructure.MySql.Migrations
                         .HasColumnType("int");
 
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<TimeSpan?>("CreditsStart")
+                        .HasColumnType("time(6)");
 
                     b.Property<DateTime>("DateAdded")
                         .HasColumnType("datetime(6)");

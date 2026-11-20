@@ -794,7 +794,8 @@ public class PlexServerApiClient(PlexEtag plexEtag, ILogger<PlexServerApiClient>
                 DisplayAspectRatio = media.AspectRatio == 0
                     ? string.Empty
                     : media.AspectRatio.ToString("0.00###", CultureInfo.InvariantCulture),
-                Chapters = Optional(response.Chapters).Flatten().Map(ProjectToModel).ToList()
+                Chapters = Optional(response.Chapters).Flatten().Map(ProjectToModel).ToList(),
+                CreditsStart = GetCreditsStart(response)
             };
 
             // orientation is omitted when content should not be rotated
@@ -1222,6 +1223,13 @@ public class PlexServerApiClient(PlexEtag plexEtag, ILogger<PlexServerApiClient>
             StartTime = TimeSpan.FromMilliseconds(chapter.StartTimeOffset),
             EndTime = TimeSpan.FromMilliseconds(chapter.EndTimeOffset)
         };
+
+    // plex marks the credits that run to the end of the media as final
+    internal static TimeSpan? GetCreditsStart(PlexMetadataResponse response) =>
+        Optional(response.Markers).Flatten()
+            .Where(m => m.Type == "credits" && m.Final)
+            .Select(m => (TimeSpan?)TimeSpan.FromMilliseconds(m.StartTimeOffset))
+            .FirstOrDefault();
 
     private PlexOtherVideo ProjectToOtherVideo(PlexMetadataResponse response, int mediaSourceId, PlexLibrary library)
     {

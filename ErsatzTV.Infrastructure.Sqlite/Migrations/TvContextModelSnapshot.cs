@@ -284,6 +284,9 @@ namespace ErsatzTV.Infrastructure.Sqlite.Migrations
                     b.Property<string>("Categories")
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("EndCreditsKeepSeconds")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("FFmpegProfileId")
                         .HasColumnType("INTEGER");
 
@@ -349,6 +352,9 @@ namespace ErsatzTV.Infrastructure.Sqlite.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER")
                         .HasDefaultValue(true);
+
+                    b.Property<bool>("SkipEndCredits")
+                        .HasColumnType("INTEGER");
 
                     b.Property<double?>("SlugSeconds")
                         .HasColumnType("REAL");
@@ -1379,6 +1385,9 @@ namespace ErsatzTV.Infrastructure.Sqlite.Migrations
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
+
+                    b.Property<TimeSpan?>("CreditsStart")
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime>("DateAdded")
                         .HasColumnType("TEXT");

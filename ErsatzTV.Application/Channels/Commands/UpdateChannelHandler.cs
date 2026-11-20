@@ -72,6 +72,8 @@ public class UpdateChannelHandler(
         c.MusicVideoCreditsMode = update.MusicVideoCreditsMode;
         c.MusicVideoCreditsTemplate = update.MusicVideoCreditsTemplate;
         c.SongVideoMode = update.SongVideoMode;
+        c.SkipEndCredits = update.SkipEndCredits;
+        c.EndCreditsKeepSeconds = update.EndCreditsKeepSeconds;
         c.TranscodeMode = update.TranscodeMode;
         c.IdleBehavior = update.IdleBehavior;
         c.IsEnabled = update.IsEnabled;

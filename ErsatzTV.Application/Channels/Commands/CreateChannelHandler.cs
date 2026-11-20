@@ -99,6 +99,8 @@ public class CreateChannelHandler(
                 MusicVideoCreditsMode = request.MusicVideoCreditsMode,
                 MusicVideoCreditsTemplate = request.MusicVideoCreditsTemplate,
                 SongVideoMode = request.SongVideoMode,
+                SkipEndCredits = request.SkipEndCredits,
+                EndCreditsKeepSeconds = request.EndCreditsKeepSeconds,
                 TranscodeMode = request.TranscodeMode,
                 IdleBehavior = request.IdleBehavior,
                 IsEnabled = request.IsEnabled,
