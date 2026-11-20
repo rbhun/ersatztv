@@ -150,6 +150,9 @@
     <data name="ButtonSupportLogs" xml:space="preserve">
         <value>Logs</value>
     </data>
+    <data name="ButtonSupportPerformance" xml:space="preserve">
+        <value>Performance</value>
+    </data>
     <data name="ButtonSupportTroubleshooting" xml:space="preserve">
         <value>Troubleshooting</value>
     </data>

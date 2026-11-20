@@ -26,6 +26,7 @@ namespace ErsatzTV.Application.Streaming;
 
 public class HlsSessionWorker : IHlsSessionWorker
 {
+    private const int MaxPerformanceHistory = 25;
     private static int _workAheadCount;
     private readonly OutputFormatKind _outputFormatKind;
     private readonly IHlsInitSegmentCache _hlsInitSegmentCache;
@@ -39,7 +40,10 @@ public class HlsSessionWorker : IHlsSessionWorker
     private readonly IMediator _mediator;
     private readonly SemaphoreSlim _slim = new(1, 1);
     private readonly Lock _sync = new();
+    private readonly Lock _performanceSync = new();
+    private readonly LinkedList<FFmpegTranscodePerformance> _performanceHistory = [];
     private readonly Option<FrameRate> _targetFramerate;
+    private FFmpegTranscodeMonitor _currentTranscode;
     private CancellationTokenSource _cancellationTokenSource;
     private string _channelNumber;
     private DateTimeOffset _channelStart;
@@ -168,6 +172,61 @@ public class HlsSessionWorker : IHlsSessionWorker
 
     public HlsSessionModel GetModel() =>
         new(_channelNumber, _state.ToString(), _transcodedUntil, _lastAccess, _channelStart);
+
+    public HlsSessionPerformanceModel GetPerformance()
+    {
+        lock (_performanceSync)
+        {
+            DateTimeOffset transcodedUntil = _transcodedUntil;
+            FFmpegTranscodePerformance current = null;
+            if (_currentTranscode is not null)
+            {
+                current = _currentTranscode.GetPerformance();
+                foreach (DateTimeOffset until in _currentTranscode.TranscodedUntil)
+                {
+                    transcodedUntil = until;
+                }
+            }
+
+            return new HlsSessionPerformanceModel(
+                _channelNumber,
+                _state.ToString(),
+                true,
+                _channelStart,
+                (transcodedUntil - DateTimeOffset.Now).TotalSeconds,
+                current,
+                _performanceHistory.ToList());
+        }
+    }
+
+    private void StartTranscodeMonitor(FFmpegTranscodeMonitor monitor)
+    {
+        lock (_performanceSync)
+        {
+            _currentTranscode = monitor;
+        }
+    }
+
+    private void CompleteTranscodeMonitor(FFmpegTranscodeMonitor monitor, bool? succeeded)
+    {
+        monitor.Complete(succeeded);
+
+        lock (_performanceSync)
+        {
+            if (ReferenceEquals(_currentTranscode, monitor))
+            {
+                _currentTranscode = null;
+            }
+
+            _performanceHistory.AddFirst(monitor.GetPerformance());
+            while (_performanceHistory.Count > MaxPerformanceHistory)
+            {
+                _performanceHistory.RemoveLast();
+            }
+        }
+
+        monitor.Dispose();
+    }
 
     void IDisposable.Dispose()
     {
@@ -543,6 +602,15 @@ public class HlsSessionWorker : IHlsSessionWorker
 
                 _logger.LogDebug("ffmpeg hls arguments {FFmpegArguments}", process.Arguments);
 
+                var monitor = new FFmpegTranscodeMonitor(
+                    processModel.MediaItemId,
+                    processModel.IsWorkingAhead,
+                    isSlug,
+                    now,
+                    process.Arguments);
+                bool? succeeded = null;
+                StartTranscodeMonitor(monitor);
+
                 try
                 {
                     using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -561,14 +629,19 @@ public class HlsSessionWorker : IHlsSessionWorker
                             linkedCts.Token);
                     }
 
-                    var progressParser = new FFmpegProgress();
+                    FFmpegProgress progressParser = monitor.Progress;
 
-                    CommandResult commandResult = await processWithPipe
+                    CommandTask<CommandResult> commandTask = processWithPipe
                         .WithWorkingDirectory(_workingDirectory)
                         .WithStandardErrorPipe(PipeTarget.ToStringBuilder(stdErrBuffer))
-                        .WithStandardOutputPipe(PipeTarget.ToDelegate(progressParser.ParseLine))
+                        .WithStandardOutputPipe(PipeTarget.ToDelegate(monitor.ParseLine))
                         .WithValidation(CommandResultValidation.None)
                         .ExecuteAsync(linkedCts.Token);
+
+                    monitor.AttachProcess(commandTask.ProcessId);
+
+                    CommandResult commandResult = await commandTask;
+                    succeeded = commandResult.ExitCode == 0;
 
                     if (commandResult.ExitCode == 0)
                     {
@@ -653,6 +726,8 @@ public class HlsSessionWorker : IHlsSessionWorker
                 }
                 finally
                 {
+                    CompleteTranscodeMonitor(monitor, succeeded);
+
                     foreach (Pipe pipe in maybePipe)
                     {
                         await pipe.Writer.CompleteAsync();

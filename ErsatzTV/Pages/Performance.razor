@@ -1,0 +1,483 @@
+@page "/system/performance"
+@using System.Globalization
+@using ErsatzTV.Application.Channels
+@using ErsatzTV.Application.FFmpegProfiles
+@using ErsatzTV.Application.MediaItems
+@using ErsatzTV.Core.FFmpeg
+@using ErsatzTV.Core.Interfaces.FFmpeg
+@implements IDisposable
+@inject IMediator Mediator
+@inject IFFmpegSegmenterService SegmenterService
+
+<MudForm Style="max-height: 100%">
+    <div class="d-flex flex-column" style="height: 100vh; overflow-x: auto">
+        <MudContainer MaxWidth="MaxWidth.ExtraLarge" Class="pt-8 pb-8">
+            <MudText Typo="Typo.h5" Class="mb-2">Performance</MudText>
+            <MudDivider Class="mb-6"/>
+            <MudText Typo="Typo.body2" Class="mb-6">
+                Live transcoding statistics for every active channel, updated every second.
+                Speed must stay at or above 1.0x and the buffer must stay above zero, or clients will stall.
+                Duplicated or dropped frames come from frame rate conversion inside ffmpeg; players do not count these as dropped frames.
+            </MudText>
+            @if (_sessions.Count == 0)
+            {
+                <MudPaper Class="pa-6">
+                    <MudText>No channels are streaming right now. Start playback on a channel to see its statistics here.</MudText>
+                    <MudText Typo="Typo.body2" Class="mt-2">
+                        Statistics are collected for channels using the HLS Segmenter and MPEG-TS streaming modes.
+                    </MudText>
+                </MudPaper>
+            }
+            @foreach (HlsSessionPerformanceModel session in _sessions)
+            {
+                Option<ChannelViewModel> maybeChannel = Optional(_channels.Find(c => c.Number == session.ChannelNumber));
+                Option<FFmpegProfileViewModel> maybeProfile = maybeChannel.Bind(c => Optional(_profiles.Find(p => p.Id == c.FFmpegProfileId)));
+                HardwareAccelerationKind configuredAccel = maybeProfile.Map(p => p.HardwareAcceleration).IfNone(HardwareAccelerationKind.None);
+
+                <MudPaper Class="pa-6 mb-6">
+                    <div class="d-flex flex-row flex-wrap align-center mb-4" style="gap: 8px">
+                        <MudText Typo="Typo.h6">
+                            @session.ChannelNumber - @maybeChannel.Map(c => c.Name).IfNone("Unknown channel")
+                        </MudText>
+                        <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@session.State</MudChip>
+                        @foreach (FFmpegProfileViewModel profile in maybeProfile)
+                        {
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
+                                Profile: @profile.Name (@AccelName(configuredAccel))
+                            </MudChip>
+                        }
+                        <MudSpacer/>
+                        <MudText Typo="Typo.caption">Session started @session.StartedAt.ToLocalTime().ToString("T", CultureInfo.CurrentCulture)</MudText>
+                    </div>
+
+                    @if (!session.IsSupported)
+                    {
+                        <MudAlert Severity="Severity.Info" Dense="true">
+                            Live statistics are not available for channels using the ErsatzTV Next streaming engine.
+                        </MudAlert>
+                    }
+                    else
+                    {
+                        FFmpegTranscodePerformance current = session.Current;
+                        FFmpegTranscodePerformance latest = current ?? session.History.FirstOrDefault();
+
+                    <MudGrid Spacing="2" Class="mb-4">
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudPaper Outlined="true" Class="pa-3" Style="height: 100%">
+                                <MudText Typo="Typo.caption">Buffer ahead of live</MudText>
+                                <MudText Typo="Typo.h5" Color="@BufferColor(session.BufferSeconds)">
+                                    @(session.BufferSeconds is { } buffer ? $"{buffer:0.0}s" : "-")
+                                </MudText>
+                                <MudText Typo="Typo.caption">Clients stall when this reaches 0</MudText>
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudPaper Outlined="true" Class="pa-3" Style="height: 100%">
+                                <MudText Typo="Typo.caption">Transcode speed (now / average / slowest)</MudText>
+                                @if (latest is not null)
+                                {
+                                    <MudText Typo="Typo.h5">
+                                        <MudText Inline="true" Typo="Typo.h5" Color="@SpeedColor(current?.Progress.CurrentSpeed, latest.IsWorkingAhead)">@Speed(current?.Progress.CurrentSpeed)</MudText>
+                                        <MudText Inline="true" Typo="Typo.h6"> / </MudText>
+                                        <MudText Inline="true" Typo="Typo.h6" Color="@SpeedColor(latest.Progress.Speed, latest.IsWorkingAhead)">@Speed(latest.Progress.Speed)</MudText>
+                                        <MudText Inline="true" Typo="Typo.h6"> / </MudText>
+                                        <MudText Inline="true" Typo="Typo.h6" Color="@SpeedColor(latest.Progress.SlowestSpeed, latest.IsWorkingAhead)">@Speed(latest.Progress.SlowestSpeed)</MudText>
+                                    </MudText>
+                                    <MudText Typo="Typo.caption">
+                                        @(latest.IsWorkingAhead ? "Working ahead (unthrottled), needs well above 1.0x" : "Realtime (throttled), should sit at 1.0x")
+                                    </MudText>
+                                }
+                                else
+                                {
+                                    <MudText Typo="Typo.h5">-</MudText>
+                                }
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudPaper Outlined="true" Class="pa-3" Style="height: 100%">
+                                <MudText Typo="Typo.caption">ffmpeg CPU (now / average)</MudText>
+                                <MudText Typo="Typo.h5">
+                                    @Percent(current?.CpuPercent) / @Percent(latest?.AverageCpuPercent)
+                                </MudText>
+                                <MudText Typo="Typo.caption">100% = one full core (@Environment.ProcessorCount cores available)</MudText>
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="3">
+                            <MudPaper Outlined="true" Class="pa-3" Style="height: 100%">
+                                <MudText Typo="Typo.caption">Frames (dropped / duplicated)</MudText>
+                                <MudText Typo="Typo.h5">
+                                    <MudText Inline="true" Typo="Typo.h5" Color="@CountColor(latest?.Progress.DroppedFrames)">@Count(latest?.Progress.DroppedFrames)</MudText>
+                                    /
+                                    <MudText Inline="true" Typo="Typo.h5" Color="@CountColor(latest?.Progress.DuplicatedFrames)">@Count(latest?.Progress.DuplicatedFrames)</MudText>
+                                </MudText>
+                                <MudText Typo="Typo.caption">
+                                    @Count(latest?.Progress.Frame) frames at @(latest?.Progress.Fps is { } fps ? $"{fps:0.#} fps" : "-")@(string.IsNullOrWhiteSpace(latest?.Progress.Bitrate) ? "" : $", {latest.Progress.Bitrate}")
+                                </MudText>
+                            </MudPaper>
+                        </MudItem>
+                    </MudGrid>
+
+                    @if (latest is not null)
+                    {
+                        Option<MediaItemInfo> maybeInfo = GetMediaItemInfo(latest.MediaItemId);
+                        FFmpegAccelerationInfo accel = latest.Acceleration;
+
+                        <MudSimpleTable Dense="true" Bordered="false" Class="mb-4">
+                            <tbody>
+                            <tr>
+                                <td style="width: 160px"><b>@(current is null ? "Last item" : "Now transcoding")</b></td>
+                                <td>@ItemTitle(latest, maybeInfo)</td>
+                            </tr>
+                            <tr>
+                                <td><b>Source</b></td>
+                                <td>@SourceText(maybeInfo)</td>
+                            </tr>
+                            <tr>
+                                <td><b>Video decode</b></td>
+                                <td>
+                                    <MudChip T="string" Size="Size.Small" Color="@HwColor(accel.IsHardwareDecode, accel.IsVideoCopy)">@HwLabel(accel.IsHardwareDecode, accel.IsVideoCopy)</MudChip>
+                                    @DecoderText(accel)
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><b>Video encode</b></td>
+                                <td>
+                                    <MudChip T="string" Size="Size.Small" Color="@HwColor(accel.IsHardwareEncode, accel.IsVideoCopy)">@HwLabel(accel.IsHardwareEncode, accel.IsVideoCopy)</MudChip>
+                                    @(accel.IsVideoCopy ? "copy (no transcode)" : accel.VideoEncoder ?? "unknown")
+                                    @if (!string.IsNullOrWhiteSpace(accel.OutputFrameRate))
+                                    {
+                                        <span> at @FrameRateText(accel.OutputFrameRate) fps</span>
+                                    }
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><b>GPU filters</b></td>
+                                <td>@(accel.HardwareFilters.Count == 0 ? "none" : string.Join(", ", accel.HardwareFilters))</td>
+                            </tr>
+                            </tbody>
+                        </MudSimpleTable>
+
+                        @foreach ((Severity severity, string message) in Diagnose(configuredAccel, latest, maybeInfo))
+                        {
+                            <MudAlert Severity="@severity" Dense="true" Class="mb-2">@message</MudAlert>
+                        }
+                    }
+
+                    @if (session.History.Count > 0)
+                    {
+                        <MudText Typo="Typo.subtitle2" Class="mt-4 mb-2">Recent items</MudText>
+                        <MudSimpleTable Dense="true" Hover="true" Style="overflow-x: auto">
+                            <thead>
+                            <tr>
+                                <th>Started</th>
+                                <th>Item</th>
+                                <th>Mode</th>
+                                <th>Avg speed</th>
+                                <th>Slowest</th>
+                                <th>Dropped</th>
+                                <th>Duplicated</th>
+                                <th>Avg CPU</th>
+                                <th>Decode</th>
+                                <th>Encode</th>
+                                <th>Result</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            @foreach (FFmpegTranscodePerformance item in session.History)
+                            {
+                                Option<MediaItemInfo> itemInfo = GetMediaItemInfo(item.MediaItemId);
+                                <tr>
+                                    <td>@item.StartedAt.ToLocalTime().ToString("T", CultureInfo.CurrentCulture)</td>
+                                    <td>@ItemTitle(item, itemInfo)</td>
+                                    <td>@(item.IsWorkingAhead ? "Work ahead" : "Realtime")</td>
+                                    <td><MudText Typo="Typo.body2" Color="@SpeedColor(item.Progress.Speed, item.IsWorkingAhead)">@Speed(item.Progress.Speed)</MudText></td>
+                                    <td><MudText Typo="Typo.body2" Color="@SpeedColor(item.Progress.SlowestSpeed, item.IsWorkingAhead)">@Speed(item.Progress.SlowestSpeed)</MudText></td>
+                                    <td><MudText Typo="Typo.body2" Color="@CountColor(item.Progress.DroppedFrames)">@Count(item.Progress.DroppedFrames)</MudText></td>
+                                    <td><MudText Typo="Typo.body2" Color="@CountColor(item.Progress.DuplicatedFrames)">@Count(item.Progress.DuplicatedFrames)</MudText></td>
+                                    <td>@Percent(item.AverageCpuPercent)</td>
+                                    <td>@HwLabel(item.Acceleration.IsHardwareDecode, item.Acceleration.IsVideoCopy)</td>
+                                    <td>@HwLabel(item.Acceleration.IsHardwareEncode, item.Acceleration.IsVideoCopy)</td>
+                                    <td>
+                                        @switch (item.Succeeded)
+                                        {
+                                            case true:
+                                                <MudIcon Icon="@Icons.Material.Filled.Check" Color="Color.Success" Size="Size.Small"/>
+                                                break;
+                                            case false:
+                                                <MudTooltip Text="ffmpeg failed; check the logs">
+                                                    <MudIcon Icon="@Icons.Material.Filled.Error" Color="Color.Error" Size="Size.Small"/>
+                                                </MudTooltip>
+                                                break;
+                                            default:
+                                                <MudTooltip Text="Stopped before finishing">
+                                                    <MudIcon Icon="@Icons.Material.Filled.Stop" Size="Size.Small"/>
+                                                </MudTooltip>
+                                                break;
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                            </tbody>
+                        </MudSimpleTable>
+                    }
+                    }
+                </MudPaper>
+            }
+        </MudContainer>
+    </div>
+</MudForm>
+
+@code {
+    private readonly CancellationTokenSource _cts = new();
+    private readonly Dictionary<int, Option<MediaItemInfo>> _mediaItemInfo = [];
+    private readonly System.Collections.Generic.HashSet<int> _pendingMediaItemInfo = [];
+    private List<HlsSessionPerformanceModel> _sessions = [];
+    private List<ChannelViewModel> _channels = [];
+    private List<FFmpegProfileViewModel> _profiles = [];
+    private bool _channelsStale = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        SegmenterService.OnWorkersChanged += WorkersChanged;
+        await Refresh(_cts.Token);
+        _ = PollLoop(_cts.Token);
+    }
+
+    public void Dispose()
+    {
+        SegmenterService.OnWorkersChanged -= WorkersChanged;
+        _cts.Cancel();
+        _cts.Dispose();
+    }
+
+    private void WorkersChanged(object sender, EventArgs e) => _channelsStale = true;
+
+    private async Task PollLoop(CancellationToken cancellationToken)
+    {
+        try
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+            while (await timer.WaitForNextTickAsync(cancellationToken))
+            {
+                await Refresh(cancellationToken);
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // do nothing
+        }
+    }
+
+    private async Task Refresh(CancellationToken cancellationToken)
+    {
+        if (_channelsStale)
+        {
+            _channelsStale = false;
+            _channels = await Mediator.Send(new GetAllChannels(), cancellationToken);
+            _profiles = await Mediator.Send(new GetAllFFmpegProfiles(), cancellationToken);
+        }
+
+        _sessions = SegmenterService.Workers
+            .Map(w => w.GetPerformance())
+            .OrderBy(s => decimal.TryParse(s.ChannelNumber, CultureInfo.InvariantCulture, out decimal n) ? n : decimal.MaxValue)
+            .ToList();
+
+        var mediaItemIds = _sessions
+            .SelectMany(s => s.History.Append(s.Current))
+            .Where(p => p?.MediaItemId is not null)
+            .Select(p => p.MediaItemId.Value)
+            .Distinct()
+            .Where(id => !_mediaItemInfo.ContainsKey(id) && !_pendingMediaItemInfo.Contains(id))
+            .ToList();
+
+        foreach (int mediaItemId in mediaItemIds)
+        {
+            _pendingMediaItemInfo.Add(mediaItemId);
+            try
+            {
+                Either<BaseError, MediaItemInfo> result = await Mediator.Send(new GetMediaItemInfo(mediaItemId), cancellationToken);
+                _mediaItemInfo[mediaItemId] = result.ToOption();
+            }
+            finally
+            {
+                _pendingMediaItemInfo.Remove(mediaItemId);
+            }
+        }
+    }
+
+    private Option<MediaItemInfo> GetMediaItemInfo(int? mediaItemId) =>
+        mediaItemId is { } id && _mediaItemInfo.TryGetValue(id, out Option<MediaItemInfo> info) ? info : None;
+
+    private static string ItemTitle(FFmpegTranscodePerformance performance, Option<MediaItemInfo> maybeInfo)
+    {
+        if (performance.IsSlug)
+        {
+            return "Slug (filler between items)";
+        }
+
+        return maybeInfo.Match(
+            info => info.Title,
+            () => performance.MediaItemId is { } id ? $"Media item {id}" : "Unknown item");
+    }
+
+    private static string SourceText(Option<MediaItemInfo> maybeInfo) =>
+        maybeInfo.Match(
+            info =>
+            {
+                var parts = new List<string>();
+                MediaItemInfoStream video = info.Streams.Find(s => s.Kind == MediaStreamKind.Video && s.AttachedPic != true);
+                if (video is not null)
+                {
+                    string codec = string.IsNullOrWhiteSpace(video.Profile) ? video.Codec : $"{video.Codec} ({video.Profile})";
+                    parts.Add(codec);
+                    if (!string.IsNullOrWhiteSpace(video.PixelFormat))
+                    {
+                        parts.Add(video.PixelFormat);
+                    }
+                }
+
+                if (info.Width > 0 && info.Height > 0)
+                {
+                    parts.Add($"{info.Width}x{info.Height}");
+                }
+
+                if (!string.IsNullOrWhiteSpace(info.RFrameRate))
+                {
+                    parts.Add($"{FrameRateText(info.RFrameRate)} fps");
+                }
+
+                if (info.VideoScanKind == VideoScanKind.Interlaced)
+                {
+                    parts.Add("interlaced");
+                }
+
+                return parts.Count == 0 ? "unknown" : string.Join(", ", parts);
+            },
+            () => "unknown");
+
+    private static IEnumerable<(Severity, string)> Diagnose(
+        HardwareAccelerationKind configuredAccel,
+        FFmpegTranscodePerformance performance,
+        Option<MediaItemInfo> maybeInfo)
+    {
+        FFmpegAccelerationInfo accel = performance.Acceleration;
+        FFmpegProgressSnapshot progress = performance.Progress;
+
+        if (progress.SlowestSpeed is { } slowest && slowest < 1.0 && !performance.IsWorkingAhead)
+        {
+            yield return (Severity.Warning,
+                $"ffmpeg briefly fell to {slowest:0.00}x. If this happens often or the buffer runs low, the server can't transcode this item in real time.");
+        }
+
+        if (performance.IsWorkingAhead && progress.Speed is { } speed && speed < 1.0)
+        {
+            yield return (Severity.Error,
+                $"ffmpeg is only reaching {speed:0.00}x while trying to work ahead. This item can't be transcoded fast enough for smooth playback.");
+        }
+
+        if (!accel.IsVideoCopy && configuredAccel is not HardwareAccelerationKind.None)
+        {
+            if (!accel.IsHardwareDecode)
+            {
+                yield return (Severity.Warning,
+                    $"The profile uses {AccelName(configuredAccel)}, but this item is decoded in software. Usually the hardware can't decode this source format (see Troubleshooting > Hardware).");
+            }
+
+            if (!accel.IsHardwareEncode)
+            {
+                yield return (Severity.Warning,
+                    $"The profile uses {AccelName(configuredAccel)}, but this item is encoded in software.");
+            }
+
+            if (accel.DownloadsFromHardware)
+            {
+                yield return (Severity.Info,
+                    "Frames are copied from the GPU back to the CPU for some filters (for example subtitles, watermarks or padding), which costs extra CPU.");
+            }
+        }
+
+        if (!accel.IsVideoCopy && configuredAccel is HardwareAccelerationKind.None)
+        {
+            yield return (Severity.Info, "Hardware acceleration is disabled in this channel's ffmpeg profile; all video work happens on the CPU.");
+        }
+
+        foreach (MediaItemInfo info in maybeInfo)
+        {
+            foreach (double sourceFps in FFmpegAccelerationInfo.ParseFrameRate(info.RFrameRate))
+            {
+                foreach (double outputFps in accel.OutputFrameRateValue)
+                {
+                    if (Math.Abs(sourceFps - outputFps) > 0.01)
+                    {
+                        string verb = outputFps > sourceFps ? "duplicates" : "drops";
+                        yield return (Severity.Info,
+                            $"Source is {sourceFps:0.###} fps and output is {outputFps:0.###} fps, so ffmpeg {verb} frames to convert. This can look like judder or dropped frames even though nothing is lost in transit.");
+                    }
+                }
+            }
+        }
+    }
+
+    private static string DecoderText(FFmpegAccelerationInfo accel)
+    {
+        if (accel.IsVideoCopy)
+        {
+            return "not decoded (copy)";
+        }
+
+        string decoder = string.IsNullOrWhiteSpace(accel.VideoDecoder) ? null : accel.VideoDecoder;
+        if (accel.HardwareAcceleration is not null)
+        {
+            return decoder is null ? accel.HardwareAcceleration : $"{decoder} via {accel.HardwareAcceleration}";
+        }
+
+        return decoder ?? "auto";
+    }
+
+    private static string HwLabel(bool isHardware, bool isCopy) => isCopy ? "Copy" : isHardware ? "Hardware" : "Software";
+
+    private static Color HwColor(bool isHardware, bool isCopy) => isCopy ? Color.Default : isHardware ? Color.Success : Color.Warning;
+
+    private static string AccelName(HardwareAccelerationKind kind) => kind switch
+    {
+        HardwareAccelerationKind.None => "no hardware acceleration",
+        HardwareAccelerationKind.Qsv => "Intel QSV",
+        HardwareAccelerationKind.Nvenc => "NVIDIA NVENC",
+        HardwareAccelerationKind.Vaapi => "VAAPI",
+        HardwareAccelerationKind.VideoToolbox => "VideoToolbox",
+        HardwareAccelerationKind.Amf => "AMD AMF",
+        HardwareAccelerationKind.V4l2m2m => "V4L2 M2M",
+        HardwareAccelerationKind.Rkmpp => "Rockchip MPP",
+        _ => kind.ToString()
+    };
+
+    private static string FrameRateText(string frameRate) =>
+        FFmpegAccelerationInfo.ParseFrameRate(frameRate).Match(fps => fps.ToString("0.###", CultureInfo.CurrentCulture), () => frameRate);
+
+    private static string Speed(double? speed) => speed is { } s ? $"{s:0.00}x" : "-";
+
+    private static string Percent(double? percent) => percent is { } p ? $"{p:0}%" : "-";
+
+    private static string Count(long? count) => count?.ToString("N0", CultureInfo.CurrentCulture) ?? "-";
+
+    private static Color SpeedColor(double? speed, bool isWorkingAhead) => speed switch
+    {
+        null => Color.Default,
+        { } s when isWorkingAhead && s < 1.0 => Color.Error,
+        { } s when isWorkingAhead && s <= 1.5 => Color.Warning,
+        { } s when !isWorkingAhead && s < 0.95 => Color.Error,
+        { } s when !isWorkingAhead && s < 0.99 => Color.Warning,
+        _ => Color.Success
+    };
+
+    private static Color BufferColor(double? seconds) => seconds switch
+    {
+        null => Color.Default,
+        < 3 => Color.Error,
+        < 10 => Color.Warning,
+        _ => Color.Success
+    };
+
+    private static Color CountColor(long? count) => count is > 0 ? Color.Warning : Color.Default;
+}

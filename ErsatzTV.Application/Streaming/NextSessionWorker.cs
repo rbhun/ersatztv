@@ -104,6 +104,9 @@ public class NextSessionWorker(
 
     public HlsSessionModel GetModel() => new(_channelNumber, "next", null, _lastTouch, _sessionStart);
 
+    public HlsSessionPerformanceModel GetPerformance() =>
+        HlsSessionPerformanceModel.NotSupported(_channelNumber, "next", _sessionStart);
+
     public async Task Run(
         string channelNumber,
         Option<TimeSpan> idleTimeout,

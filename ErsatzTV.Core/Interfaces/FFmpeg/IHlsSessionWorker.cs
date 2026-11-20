@@ -9,6 +9,7 @@ public interface IHlsSessionWorker : IDisposable
     Task<Option<TrimPlaylistResult>> TrimPlaylist(DateTimeOffset filterBefore, CancellationToken cancellationToken);
     void PlayoutUpdated();
     HlsSessionModel GetModel();
+    HlsSessionPerformanceModel GetPerformance();
     Task Run(string channelNumber, Option<TimeSpan> idleTimeout, CancellationToken incomingCancellationToken);
     Task WaitForPlaylistSegments(int initialSegmentCount, CancellationToken cancellationToken);
 }

@@ -309,6 +309,12 @@ namespace ErsatzTV.Locals.Shared {
             }
         }
         
+        internal static string ButtonSupportPerformance {
+            get {
+                return ResourceManager.GetString("ButtonSupportPerformance", resourceCulture);
+            }
+        }
+        
         internal static string ButtonSupportTroubleshooting {
             get {
                 return ResourceManager.GetString("ButtonSupportTroubleshooting", resourceCulture);

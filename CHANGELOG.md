@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
+### Added
+- Add `System` > `Performance` page with live transcoding statistics for each active HLS Segmenter / MPEG-TS session
+  - Buffer ahead of live, transcode speed (current, average, slowest) and ffmpeg CPU usage
+  - Dropped and duplicated frames reported by ffmpeg, with a note when source and output frame rates differ
+  - Whether video decode and encode are actually using hardware acceleration, including GPU filters and software fallbacks
+  - History of recent items per channel
 
 ## [26.13.0] - 2026-11-20
 ### Changed
