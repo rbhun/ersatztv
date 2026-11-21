@@ -24,6 +24,31 @@ public class FFmpegAccelerationInfoTests
         result.OutputFrameRate.ShouldBe("30000/1001");
         result.HardwareFilters.ShouldBeEmpty();
         result.OutputFrameRateValue.IfNone(0).ShouldBe(29.97, 0.001);
+        result.OutputWidth.ShouldBeNull();
+        result.VideoBitrate.ShouldBe("2000k");
+    }
+
+    [Test]
+    public void Output_Size_Prefers_Pad_Over_Scale()
+    {
+        const string ARGUMENTS =
+            "-i /tmp/a.mkv -i /tmp/logo.png -filter_complex [1:0]scale=200:-1[wm];[0:0]scale=1920:800:force_original_aspect_ratio=decrease,pad=1920:1080:-1:-1:color=black[v];[v][wm]overlay[vo] -c:v libx264 -b:v 6000k -f mpegts pipe:1";
+
+        FFmpegAccelerationInfo result = FFmpegAccelerationInfo.FromArguments(ARGUMENTS);
+
+        result.OutputWidth.ShouldBe(1920);
+        result.OutputHeight.ShouldBe(1080);
+        result.VideoBitrate.ShouldBe("6000k");
+    }
+
+    [Test]
+    public void Output_Size_From_Hardware_Scale()
+    {
+        FFmpegAccelerationInfo result = FFmpegAccelerationInfo.FromArguments(
+            "-hwaccel vaapi -i /tmp/a.mkv -filter_complex [0:0]scale_vaapi=1280:720:force_original_aspect_ratio=decrease[v] -c:v h264_vaapi -f mpegts pipe:1");
+
+        result.OutputWidth.ShouldBe(1280);
+        result.OutputHeight.ShouldBe(720);
     }
 
     [Test]

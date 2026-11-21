@@ -18,7 +18,10 @@ public partial class FFmpegProgress
     private long? _frame;
     private long? _droppedFrames;
     private long? _duplicatedFrames;
-    private string _bitrate;
+    private double? _bitrateKbps;
+    private double? _currentBitrateKbps;
+    private long? _totalSize;
+    private long? _lastReportTotalSize;
     private TimeSpan? _outTime;
     private TimeSpan? _lastReportOutTime;
     private long _lastReportTimestamp;
@@ -47,7 +50,8 @@ public partial class FFmpegProgress
                 _frame,
                 _droppedFrames,
                 _duplicatedFrames,
-                _bitrate);
+                _bitrateKbps,
+                _currentBitrateKbps);
         }
     }
 
@@ -89,8 +93,12 @@ public partial class FFmpegProgress
                 case "dup_frames" when TryParseLong(value, out long duplicated):
                     _duplicatedFrames = duplicated;
                     break;
-                case "bitrate":
-                    _bitrate = value == "N/A" ? null : value;
+                case "bitrate" when value.EndsWith("kbits/s", StringComparison.Ordinal) &&
+                                    TryParseDouble(value[..^"kbits/s".Length], out double bitrate):
+                    _bitrateKbps = bitrate;
+                    break;
+                case "total_size" when TryParseLong(value, out long totalSize):
+                    _totalSize = totalSize;
                     break;
                 case "out_time_us" when TryParseLong(value, out long outTimeUs) && outTimeUs >= 0:
                     _outTime = TimeSpan.FromTicks(outTimeUs * 10);
@@ -165,8 +173,14 @@ public partial class FFmpegProgress
                 return;
             }
 
-            double currentSpeed = (outTime - lastOutTime).TotalSeconds / wallSeconds;
+            double outSeconds = (outTime - lastOutTime).TotalSeconds;
+            double currentSpeed = outSeconds / wallSeconds;
             _currentSpeed = currentSpeed;
+
+            if (outSeconds > 0 && _totalSize is { } totalSize && _lastReportTotalSize is { } lastTotalSize)
+            {
+                _currentBitrateKbps = (totalSize - lastTotalSize) * 8 / outSeconds / 1000;
+            }
 
             if (_reportCount > WarmupReports)
             {
@@ -175,6 +189,7 @@ public partial class FFmpegProgress
         }
 
         _lastReportOutTime = outTime;
+        _lastReportTotalSize = _totalSize;
         _lastReportTimestamp = now;
     }
 
@@ -196,4 +211,5 @@ public record FFmpegProgressSnapshot(
     long? Frame,
     long? DroppedFrames,
     long? DuplicatedFrames,
-    string Bitrate);
+    double? BitrateKbps,
+    double? CurrentBitrateKbps);

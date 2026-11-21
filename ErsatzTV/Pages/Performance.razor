@@ -60,9 +60,10 @@
                     {
                         FFmpegTranscodePerformance current = session.Current;
                         FFmpegTranscodePerformance latest = current ?? session.History.FirstOrDefault();
+                        Option<MediaItemInfo> latestInfo = GetMediaItemInfo(latest?.MediaItemId);
 
                     <MudGrid Spacing="2" Class="mb-4">
-                        <MudItem xs="12" sm="6" md="3">
+                        <MudItem xs="12" sm="6" md="4">
                             <MudPaper Outlined="true" Class="pa-3" Style="height: 100%">
                                 <MudText Typo="Typo.caption">Buffer ahead of live</MudText>
                                 <MudText Typo="Typo.h5" Color="@BufferColor(session.BufferSeconds)">
@@ -71,7 +72,7 @@
                                 <MudText Typo="Typo.caption">Clients stall when this reaches 0</MudText>
                             </MudPaper>
                         </MudItem>
-                        <MudItem xs="12" sm="6" md="3">
+                        <MudItem xs="12" sm="6" md="4">
                             <MudPaper Outlined="true" Class="pa-3" Style="height: 100%">
                                 <MudText Typo="Typo.caption">Transcode speed (now / average / slowest)</MudText>
                                 @if (latest is not null)
@@ -93,7 +94,7 @@
                                 }
                             </MudPaper>
                         </MudItem>
-                        <MudItem xs="12" sm="6" md="3">
+                        <MudItem xs="12" sm="6" md="4">
                             <MudPaper Outlined="true" Class="pa-3" Style="height: 100%">
                                 <MudText Typo="Typo.caption">ffmpeg CPU (now / average)</MudText>
                                 <MudText Typo="Typo.h5">
@@ -102,7 +103,7 @@
                                 <MudText Typo="Typo.caption">100% = one full core (@Environment.ProcessorCount cores available)</MudText>
                             </MudPaper>
                         </MudItem>
-                        <MudItem xs="12" sm="6" md="3">
+                        <MudItem xs="12" sm="6" md="4">
                             <MudPaper Outlined="true" Class="pa-3" Style="height: 100%">
                                 <MudText Typo="Typo.caption">Frames (dropped / duplicated)</MudText>
                                 <MudText Typo="Typo.h5">
@@ -111,7 +112,29 @@
                                     <MudText Inline="true" Typo="Typo.h5" Color="@CountColor(latest?.Progress.DuplicatedFrames)">@Count(latest?.Progress.DuplicatedFrames)</MudText>
                                 </MudText>
                                 <MudText Typo="Typo.caption">
-                                    @Count(latest?.Progress.Frame) frames at @(latest?.Progress.Fps is { } fps ? $"{fps:0.#} fps" : "-")@(string.IsNullOrWhiteSpace(latest?.Progress.Bitrate) ? "" : $", {latest.Progress.Bitrate}")
+                                    @Count(latest?.Progress.Frame) frames, encoding at @(latest?.Progress.Fps is { } fps ? $"{fps:0.#} fps" : "-")
+                                </MudText>
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudPaper Outlined="true" Class="pa-3" Style="height: 100%">
+                                <MudText Typo="Typo.caption">Output video</MudText>
+                                <MudText Typo="Typo.h5">
+                                    @OutputResolution(latest?.Acceleration, latestInfo)
+                                    <MudText Inline="true" Typo="Typo.h6">@@ @OutputFrameRate(latest?.Acceleration, latestInfo)</MudText>
+                                </MudText>
+                                <MudText Typo="Typo.caption">Source @SourceResolution(latestInfo) @@ @SourceFrameRate(latestInfo)</MudText>
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem xs="12" sm="6" md="4">
+                            <MudPaper Outlined="true" Class="pa-3" Style="height: 100%">
+                                <MudText Typo="Typo.caption">Bitrate (now / average)</MudText>
+                                <MudText Typo="Typo.h5">
+                                    @Bitrate(current?.Progress.CurrentBitrateKbps)
+                                    <MudText Inline="true" Typo="Typo.h6"> / @Bitrate(latest?.Progress.BitrateKbps)</MudText>
+                                </MudText>
+                                <MudText Typo="Typo.caption">
+                                    Video and audio combined@(string.IsNullOrWhiteSpace(latest?.Acceleration.VideoBitrate) ? "" : $"; profile video target {TargetBitrate(latest.Acceleration.VideoBitrate)}")
                                 </MudText>
                             </MudPaper>
                         </MudItem>
@@ -176,6 +199,8 @@
                                 <th>Slowest</th>
                                 <th>Dropped</th>
                                 <th>Duplicated</th>
+                                <th>Output</th>
+                                <th>Avg bitrate</th>
                                 <th>Avg CPU</th>
                                 <th>Decode</th>
                                 <th>Encode</th>
@@ -194,6 +219,8 @@
                                     <td><MudText Typo="Typo.body2" Color="@SpeedColor(item.Progress.SlowestSpeed, item.IsWorkingAhead)">@Speed(item.Progress.SlowestSpeed)</MudText></td>
                                     <td><MudText Typo="Typo.body2" Color="@CountColor(item.Progress.DroppedFrames)">@Count(item.Progress.DroppedFrames)</MudText></td>
                                     <td><MudText Typo="Typo.body2" Color="@CountColor(item.Progress.DuplicatedFrames)">@Count(item.Progress.DuplicatedFrames)</MudText></td>
+                                    <td style="white-space: nowrap">@OutputResolution(item.Acceleration, itemInfo) @@ @OutputFrameRate(item.Acceleration, itemInfo)</td>
+                                    <td style="white-space: nowrap">@Bitrate(item.Progress.BitrateKbps)</td>
                                     <td>@Percent(item.AverageCpuPercent)</td>
                                     <td>@HwLabel(item.Acceleration.IsHardwareDecode, item.Acceleration.IsVideoCopy)</td>
                                     <td>@HwLabel(item.Acceleration.IsHardwareEncode, item.Acceleration.IsVideoCopy)</td>
@@ -454,6 +481,29 @@
 
     private static string FrameRateText(string frameRate) =>
         FFmpegAccelerationInfo.ParseFrameRate(frameRate).Match(fps => fps.ToString("0.###", CultureInfo.CurrentCulture), () => frameRate);
+
+    private static string SourceResolution(Option<MediaItemInfo> maybeInfo) =>
+        maybeInfo.Filter(i => i.Width > 0 && i.Height > 0).Match(i => $"{i.Width}x{i.Height}", () => "-");
+
+    private static string SourceFrameRate(Option<MediaItemInfo> maybeInfo) =>
+        maybeInfo.Filter(i => !string.IsNullOrWhiteSpace(i.RFrameRate)).Match(i => $"{FrameRateText(i.RFrameRate)} fps", () => "-");
+
+    // without an explicit scale/pad or frame rate, ffmpeg keeps the source value
+    private static string OutputResolution(FFmpegAccelerationInfo accel, Option<MediaItemInfo> maybeInfo) =>
+        accel is { OutputWidth: { } width, OutputHeight: { } height } ? $"{width}x{height}" : SourceResolution(maybeInfo);
+
+    private static string OutputFrameRate(FFmpegAccelerationInfo accel, Option<MediaItemInfo> maybeInfo) =>
+        string.IsNullOrWhiteSpace(accel?.OutputFrameRate) ? SourceFrameRate(maybeInfo) : $"{FrameRateText(accel.OutputFrameRate)} fps";
+
+    private static string Bitrate(double? kbps) => kbps switch
+    {
+        null => "-",
+        >= 1000 => $"{kbps.Value / 1000:0.0} Mbps",
+        _ => $"{kbps.Value:0} kbps"
+    };
+
+    private static string TargetBitrate(string bitrate) =>
+        bitrate.EndsWith('k') && double.TryParse(bitrate[..^1], CultureInfo.InvariantCulture, out double kbps) ? Bitrate(kbps) : bitrate;
 
     private static string Speed(double? speed) => speed is { } s ? $"{s:0.00}x" : "-";
 

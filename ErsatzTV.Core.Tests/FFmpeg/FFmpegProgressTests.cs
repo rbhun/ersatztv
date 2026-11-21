@@ -35,7 +35,7 @@ public class FFmpegProgressTests
         FFmpegProgressSnapshot snapshot = progress.GetSnapshot();
         snapshot.Frame.ShouldBe(1440);
         snapshot.Fps.ShouldBe(29.97);
-        snapshot.Bitrate.ShouldBe("2048.3kbits/s");
+        snapshot.BitrateKbps.ShouldBe(2048.3);
         snapshot.DuplicatedFrames.ShouldBe(12);
         snapshot.DroppedFrames.ShouldBe(3);
         snapshot.Speed.ShouldBe(1.01);
@@ -52,9 +52,27 @@ public class FFmpegProgressTests
         progress.ParseLine("progress=continue");
 
         FFmpegProgressSnapshot snapshot = progress.GetSnapshot();
-        snapshot.Bitrate.ShouldBeNull();
+        snapshot.BitrateKbps.ShouldBeNull();
         snapshot.Speed.ShouldBeNull();
         snapshot.CurrentSpeed.ShouldBeNull();
+    }
+
+    [Test]
+    public async Task Calculates_Current_Bitrate_Between_Reports()
+    {
+        var progress = new FFmpegProgress();
+        progress.ParseLine("total_size=1000000");
+        progress.ParseLine("out_time_us=10000000");
+        progress.ParseLine("progress=continue");
+
+        await Task.Delay(300);
+
+        // 750,000 bytes over 1 second of output = 6,000 kbps
+        progress.ParseLine("total_size=1750000");
+        progress.ParseLine("out_time_us=11000000");
+        progress.ParseLine("progress=continue");
+
+        progress.GetSnapshot().CurrentBitrateKbps.ShouldBe(6000);
     }
 
     [Test]

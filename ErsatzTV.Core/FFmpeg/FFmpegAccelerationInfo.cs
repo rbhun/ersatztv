@@ -13,7 +13,10 @@ public partial record FFmpegAccelerationInfo(
     bool IsVideoCopy,
     string OutputFrameRate,
     List<string> HardwareFilters,
-    bool DownloadsFromHardware)
+    bool DownloadsFromHardware,
+    int? OutputWidth,
+    int? OutputHeight,
+    string VideoBitrate)
 {
     private static readonly string[] HardwareCodecSuffixes =
     [
@@ -23,7 +26,7 @@ public partial record FFmpegAccelerationInfo(
     private static readonly string[] FilterOptions = ["-filter_complex", "-vf", "-filter:v"];
 
     public static readonly FFmpegAccelerationInfo Unknown =
-        new(null, null, false, null, false, false, null, [], false);
+        new(null, null, false, null, false, false, null, [], false, null, null, null);
 
     public Option<double> OutputFrameRateValue => ParseFrameRate(OutputFrameRate);
 
@@ -71,6 +74,16 @@ public partial record FFmpegAccelerationInfo(
             .Distinct()
             .ToList();
 
+        // padding always produces the final frame size; otherwise the last explicit scale does
+        Match sizeMatch = PadSize().Matches(filters).LastOrDefault() ?? ScaleSize().Matches(filters).LastOrDefault();
+        int? outputWidth = null;
+        int? outputHeight = null;
+        if (sizeMatch is not null && !isVideoCopy)
+        {
+            outputWidth = int.Parse(sizeMatch.Groups[1].Value, CultureInfo.InvariantCulture);
+            outputHeight = int.Parse(sizeMatch.Groups[2].Value, CultureInfo.InvariantCulture);
+        }
+
         return new FFmpegAccelerationInfo(
             hwaccel,
             decoder,
@@ -80,7 +93,10 @@ public partial record FFmpegAccelerationInfo(
             isVideoCopy,
             LastValue(tokens, "-r", outputStart, tokens.Count),
             hardwareFilters,
-            filters.Contains("hwdownload", StringComparison.Ordinal));
+            filters.Contains("hwdownload", StringComparison.Ordinal),
+            outputWidth,
+            outputHeight,
+            LastValue(tokens, "-b:v", outputStart, tokens.Count));
     }
 
     public static Option<double> ParseFrameRate(string frameRate)
@@ -172,4 +188,10 @@ public partial record FFmpegAccelerationInfo(
 
     [GeneratedRegex(@"\b(hwupload\w*|hwmap|[a-z0-9]+_(cuda|npp|vaapi|qsv|vt|videotoolbox|opencl|vulkan|rkrga))\b")]
     private static partial Regex HardwareFilter();
+
+    [GeneratedRegex(@"\bpad\w*=(?:w=)?(\d+):(?:h=)?(\d+)")]
+    private static partial Regex PadSize();
+
+    [GeneratedRegex(@"\b(?:scale|scale_\w+|vpp_qsv)=(?:w=)?(\d+):(?:h=)?(\d+)")]
+    private static partial Regex ScaleSize();
 }
