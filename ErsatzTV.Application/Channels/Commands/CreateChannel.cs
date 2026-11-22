@@ -23,6 +23,7 @@ public record CreateChannel(
     StreamingEngine StreamingEngine,
     NextEngineTextSubtitleMode NextEngineTextSubtitleMode,
     string NextEngineAudioLanguages,
+    string NextEngineSubtitleLanguages,
     StreamingMode StreamingMode,
     int? WatermarkId,
     int? FallbackFillerId,

@@ -337,6 +337,9 @@ namespace ErsatzTV.Infrastructure.MySql.Migrations
                     b.Property<string>("NextEngineAudioLanguages")
                         .HasColumnType("longtext");
 
+                    b.Property<string>("NextEngineSubtitleLanguages")
+                        .HasColumnType("longtext");
+
                     b.Property<int>("NextEngineTextSubtitleMode")
                         .HasColumnType("int");
 

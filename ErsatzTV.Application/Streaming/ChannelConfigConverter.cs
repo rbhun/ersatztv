@@ -16,7 +16,7 @@ namespace ErsatzTV.Application.Streaming;
 public class ChannelConfigConverter(IConfigElementRepository configElementRepository, IFileSystem fileSystem)
     : IChannelConfigConverter
 {
-    public static readonly string ChannelConfigVersion = "https://ersatztv.org/channel/version/0.1.6";
+    public static readonly string ChannelConfigVersion = "https://ersatztv.org/channel/version/0.1.7";
 
     public async Task<ChannelConfig> ToNext(
         ChannelViewModel channel,
@@ -139,15 +139,24 @@ public class ChannelConfigConverter(IConfigElementRepository configElementReposi
             videoNormalization.FrameRate = frameRate;
         }
 
+        List<string> subtitleLanguages = ChannelSubtitleLanguages.Parse(channel.NextEngineSubtitleLanguages);
         var subtitleNormalization = new Subtitle
         {
-            Mode = channel.NextEngineTextSubtitleMode switch
-            {
-                NextEngineTextSubtitleMode.Convert => SubtitleMode.Convert,
-                _ => SubtitleMode.Burn
-            },
+            Mode = subtitleLanguages.Count > 0
+                ? SubtitleMode.Mux
+                : channel.NextEngineTextSubtitleMode switch
+                {
+                    NextEngineTextSubtitleMode.Convert => SubtitleMode.Convert,
+                    _ => SubtitleMode.Burn
+                },
             FontsFolder = FileSystemLayout.FontsCacheFolder
         };
+        if (subtitleLanguages.Count > 0)
+        {
+            subtitleNormalization.Tracks = subtitleLanguages
+                .Select(language => new SubtitleTrack { Language = language, Title = LanguageTitle(language) })
+                .ToList();
+        }
 
         string playoutFolder = fileSystem.Path.Combine(FileSystemLayout.NextPlayoutsFolder, channel.Number, "current");
 

@@ -324,6 +324,9 @@ namespace ErsatzTV.Infrastructure.Sqlite.Migrations
                     b.Property<string>("NextEngineAudioLanguages")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("NextEngineSubtitleLanguages")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("NextEngineTextSubtitleMode")
                         .HasColumnType("INTEGER");
 

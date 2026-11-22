@@ -25,6 +25,7 @@ public class Channel
     public StreamingEngine StreamingEngine { get; set; }
     public NextEngineTextSubtitleMode NextEngineTextSubtitleMode { get; set; }
     public string NextEngineAudioLanguages { get; set; }
+    public string NextEngineSubtitleLanguages { get; set; }
     public StreamingMode StreamingMode { get; set; }
     public List<Playout> Playouts { get; set; }
     public List<Artwork> Artwork { get; set; }

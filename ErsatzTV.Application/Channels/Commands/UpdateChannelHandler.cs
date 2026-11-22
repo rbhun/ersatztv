@@ -53,6 +53,8 @@ public class UpdateChannelHandler(
                                 c.PreferredSubtitleLanguageCode != update.PreferredSubtitleLanguageCode ||
                                 c.NextEngineAudioLanguages !=
                                 ChannelAudioLanguages.Normalize(update.NextEngineAudioLanguages) ||
+                                c.NextEngineSubtitleLanguages !=
+                                ChannelSubtitleLanguages.Normalize(update.NextEngineSubtitleLanguages) ||
                                 c.MusicVideoCreditsMode != update.MusicVideoCreditsMode ||
                                 c.SubtitleMode != update.SubtitleMode;
 
@@ -146,6 +148,7 @@ public class UpdateChannelHandler(
         c.StreamingEngine = StreamingEngine.Next;
         c.NextEngineTextSubtitleMode = update.NextEngineTextSubtitleMode;
         c.NextEngineAudioLanguages = ChannelAudioLanguages.Normalize(update.NextEngineAudioLanguages);
+        c.NextEngineSubtitleLanguages = ChannelSubtitleLanguages.Normalize(update.NextEngineSubtitleLanguages);
         c.StreamingMode = update.StreamingMode;
         c.WatermarkId = update.WatermarkId;
         c.FallbackFillerId = update.FallbackFillerId;

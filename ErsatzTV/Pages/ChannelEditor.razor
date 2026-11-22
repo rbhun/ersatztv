@@ -151,6 +151,15 @@ else
 </MudStack>
 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
     <div class="d-flex">
+        <MudText>Subtitle Track Languages</MudText>
+    </div>
+    <MudTextField @bind-Value="_model.NextEngineSubtitleLanguages"
+                  For="@(() => _model.NextEngineSubtitleLanguages)"
+                  Placeholder="eng, hun"
+                  HelperText="Three-letter language codes, one muxed subtitle track each (MPEG-TS). Prefer PGS/DVD/DVB image subtitles — text cannot be converted to dvdsub. When set, subtitles are muxed instead of burned. Missing languages reuse the primary stream."/>
+</MudStack>
+<MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+    <div class="d-flex">
         <MudText>Streaming Mode</MudText>
     </div>
     <MudSelect @bind-Value="_model.StreamingMode" For="@(() => _model.StreamingMode)">
@@ -431,6 +440,7 @@ else
                         _model.StreamingEngine = StreamingEngine.Next;
                         _model.NextEngineTextSubtitleMode = channelViewModel.NextEngineTextSubtitleMode;
                         _model.NextEngineAudioLanguages = channelViewModel.NextEngineAudioLanguages;
+                        _model.NextEngineSubtitleLanguages = channelViewModel.NextEngineSubtitleLanguages;
                         _model.StreamingMode = channelViewModel.StreamingMode;
                         _model.StreamSelectorMode = channelViewModel.StreamSelectorMode;
                         _model.StreamSelector = channelViewModel.StreamSelector;

@@ -30,6 +30,11 @@ public class ChannelEditViewModelValidator : AbstractValidator<ChannelEditViewMo
                 .All(l => l.Length == 3 && l.All(char.IsAsciiLetterLower)))
             .WithMessage("Use three-letter language codes separated by commas, e.g. eng, spa");
 
+        RuleFor(x => x.NextEngineSubtitleLanguages)
+            .Must(languages => ChannelSubtitleLanguages.Parse(languages)
+                .All(l => l.Length == 3 && l.All(char.IsAsciiLetterLower)))
+            .WithMessage("Use three-letter language codes separated by commas, e.g. eng, hun");
+
         RuleFor(x => x.EndCreditsKeepSeconds).InclusiveBetween(0, 3600);
 
         When(

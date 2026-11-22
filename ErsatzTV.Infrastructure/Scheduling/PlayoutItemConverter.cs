@@ -37,7 +37,7 @@ public class PlayoutItemConverter(
     IDbContextFactory<TvContext> dbContextFactory,
     ILogger<PlayoutItemConverter> logger) : IPlayoutItemConverter
 {
-    public static readonly string PlayoutVersion = "https://ersatztv.org/playout/version/0.0.9";
+    public static readonly string PlayoutVersion = "https://ersatztv.org/playout/version/0.0.10";
 
     public async Task<Option<Core.Next.PlayoutItem>> ToNext(
         string channelNumber,
@@ -225,6 +225,7 @@ public class PlayoutItemConverter(
 
                 // the first channel audio language labels the primary track, so it must select it
                 List<string> audioLanguages = ChannelAudioLanguages.Parse(channel.NextEngineAudioLanguages);
+                List<string> subtitleLanguages = ChannelSubtitleLanguages.Parse(channel.NextEngineSubtitleLanguages);
                 await SelectTracks(
                     channel,
                     playoutItem,
@@ -234,12 +235,22 @@ public class PlayoutItemConverter(
                         ? audioLanguages[0]
                         : playoutItem.PreferredAudioLanguageCode ?? channel.PreferredAudioLanguageCode,
                     playoutItem.PreferredAudioTitle ?? channel.PreferredAudioTitle,
-                    playoutItem.PreferredSubtitleLanguageCode ?? channel.PreferredSubtitleLanguageCode,
+                    subtitleLanguages.Count > 0
+                        ? subtitleLanguages[0]
+                        : playoutItem.PreferredSubtitleLanguageCode ?? channel.PreferredSubtitleLanguageCode,
                     playoutItem.SubtitleMode ?? channel.SubtitleMode,
                     subtitles,
                     shouldLogMessages,
                     cancellationToken);
                 SelectExtraAudio(audioLanguages, headVersion, nextPlayoutItem, shouldLogMessages);
+                await SelectExtraSubtitle(
+                    subtitleLanguages,
+                    channel,
+                    playoutItem,
+                    nextPlayoutItem,
+                    subtitles,
+                    shouldLogMessages,
+                    cancellationToken);
                 SelectGraphics(
                     maybeGlobalWatermark,
                     channel,
@@ -650,6 +661,90 @@ public class PlayoutItemConverter(
                     .IfNone(primaryIndex.Value)
             })
             .ToList();
+    }
+
+    // Mux mode has no silent filler; reuse the primary subtitle stream index so the layout
+    // stays stable. Prefer embedded image subs (PGS/DVD) — text cannot be encoded to dvdsub.
+    private async Task SelectExtraSubtitle(
+        List<string> subtitleLanguages,
+        Channel channel,
+        PlayoutItem playoutItem,
+        Core.Next.PlayoutItem nextPlayoutItem,
+        Option<List<Subtitle>> subtitles,
+        bool shouldLogMessages,
+        CancellationToken cancellationToken)
+    {
+        if (subtitleLanguages.Count < 2)
+        {
+            return;
+        }
+
+        long? primaryIndex = nextPlayoutItem.Tracks?.Subtitle?.StreamIndex;
+        if (primaryIndex is null)
+        {
+            return;
+        }
+
+        List<Subtitle> allSubtitles = (await subtitles.IfNoneAsync(() => GetSubtitles(
+            channel,
+            playoutItem.MediaItem,
+            playoutItem.Id,
+            playoutItem.InPoint))).ToList();
+        allSubtitles.RemoveAll(s => s.IsImage && s.SubtitleKind is not SubtitleKind.Embedded);
+
+        nextPlayoutItem.Tracks.ExtraSubtitle = subtitleLanguages
+            .Skip(1)
+            .Select(language =>
+            {
+                Option<Subtitle> match = SelectSubtitleForLanguage(allSubtitles, language, preferImage: true);
+                long index = match.Map(s => (long)s.StreamIndex).IfNone(primaryIndex.Value);
+                if (shouldLogMessages && match.IsNone)
+                {
+                    logger.LogDebug(
+                        "No subtitle for language {Language}; reusing primary stream {Index}",
+                        language,
+                        primaryIndex.Value);
+                }
+
+                return new Core.Next.ExtraSubtitleTrack { StreamIndex = index };
+            })
+            .ToList();
+    }
+
+    private static Option<Subtitle> SelectSubtitleForLanguage(
+        List<Subtitle> subtitles,
+        string language,
+        bool preferImage)
+    {
+        var codes = new System.Collections.Generic.HashSet<string>(StringComparer.OrdinalIgnoreCase) { language };
+        // also match common two-letter forms when a three-letter code was configured
+        if (language.Length == 3)
+        {
+            try
+            {
+                var culture = CultureInfo.GetCultures(CultureTypes.NeutralCultures)
+                    .FirstOrDefault(c =>
+                        string.Equals(c.ThreeLetterISOLanguageName, language, StringComparison.OrdinalIgnoreCase));
+                if (culture is not null)
+                {
+                    codes.Add(culture.TwoLetterISOLanguageName);
+                }
+            }
+            catch (CultureNotFoundException)
+            {
+                // ignore
+            }
+        }
+
+        IEnumerable<Subtitle> matching = subtitles.Where(s =>
+            !string.IsNullOrWhiteSpace(s.Language) && codes.Contains(s.Language));
+
+        if (preferImage)
+        {
+            matching = matching.OrderByDescending(s => s.IsImage);
+        }
+
+        return Optional(matching.FirstOrDefault());
     }
 
     private Option<Core.Next.Source> SubtitleSource(

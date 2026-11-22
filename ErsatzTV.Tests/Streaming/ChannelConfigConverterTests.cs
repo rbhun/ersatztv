@@ -38,6 +38,7 @@ public class ChannelConfigConverterTests
         StreamingEngine: StreamingEngine.Next,
         NextEngineTextSubtitleMode: default,
         NextEngineAudioLanguages: null!,
+        NextEngineSubtitleLanguages: null!,
         StreamingMode: StreamingMode.HttpLiveStreamingSegmenter,
         WatermarkId: null,
         FallbackFillerId: null,

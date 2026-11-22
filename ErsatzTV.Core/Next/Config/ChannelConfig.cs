@@ -322,11 +322,30 @@ namespace ErsatzTV.Core.Next.Config
         public string? ForceStyle { get; set; }
 
         /// <summary>
-        /// What to do with the selected text subtitle track. Image subtitles are always burned in.
+        /// What to do with the selected subtitle track. Image subtitles are burned unless
+        /// `mode` is `mux`.
         /// </summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         [JsonPropertyName("mode")]
         public SubtitleMode? Mode { get; set; }
+
+        /// <summary>
+        /// Subtitle tracks to mux, in order. The first entry describes the primary track; each
+        /// further entry is filled from the playout item's `tracks.extra_subtitle`. Empty leaves
+        /// burn/convert behavior unchanged.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("tracks")]
+        public List<SubtitleTrack>? Tracks { get; set; }
+    }
+
+    public partial class SubtitleTrack
+    {
+        [JsonPropertyName("language")]
+        public string? Language { get; set; }
+
+        [JsonPropertyName("title")]
+        public string? Title { get; set; }
     }
 
     /// <summary>
@@ -741,13 +760,16 @@ namespace ErsatzTV.Core.Next.Config
     public enum StreamMode { Copy, Transcode };
 
     /// <summary>
-    /// What to do with the selected text subtitle track. Image subtitles are always burned in.
+    /// What to do with the selected subtitle track.
     ///
     /// Burn subtitles into the video.
     ///
     /// Convert text subtitles to a WebVTT track in the HLS stream.
+    ///
+    /// Mux subtitle streams into the MPEG-TS output (selectable tracks). Prefer image
+    /// subtitles (PGS/DVD/DVB); text-to-dvdsub is not supported by ffmpeg.
     /// </summary>
-    public enum SubtitleMode { Burn, Convert };
+    public enum SubtitleMode { Burn, Convert, Mux };
 
     /// <summary>
     /// AMD AMF. Windows only.
@@ -974,6 +996,8 @@ namespace ErsatzTV.Core.Next.Config
                     return SubtitleMode.Burn;
                 case "convert":
                     return SubtitleMode.Convert;
+                case "mux":
+                    return SubtitleMode.Mux;
             }
             throw new Exception("Cannot unmarshal type SubtitleMode");
         }
@@ -987,6 +1011,9 @@ namespace ErsatzTV.Core.Next.Config
                     return;
                 case SubtitleMode.Convert:
                     JsonSerializer.Serialize(writer, "convert", options);
+                    return;
+                case SubtitleMode.Mux:
+                    JsonSerializer.Serialize(writer, "mux", options);
                     return;
             }
             throw new Exception("Cannot marshal type SubtitleMode");

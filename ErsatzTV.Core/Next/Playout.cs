@@ -949,10 +949,32 @@ namespace ErsatzTV.Core.Next
         public TrackSelection? Subtitle { get; set; }
 
         /// <summary>
+        /// Subtitle tracks to mux after the primary `subtitle` track, filling the channel's
+        /// `normalization.subtitle.tracks` slots in order. Each is read from the same source as the
+        /// primary subtitle when possible. Slots without a matching language reuse the primary
+        /// stream index so every item keeps the same layout.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+        [JsonPropertyName("extra_subtitle")]
+        public List<ExtraSubtitleTrack>? ExtraSubtitle { get; set; }
+
+        /// <summary>
         /// Video track selection.
         /// </summary>
         [JsonPropertyName("video")]
         public TrackSelection? Video { get; set; }
+    }
+
+    /// <summary>
+    /// Fills one extra subtitle slot.
+    /// </summary>
+    public partial class ExtraSubtitleTrack
+    {
+        /// <summary>
+        /// Subtitle stream within the primary subtitle track's source.
+        /// </summary>
+        [JsonPropertyName("stream_index")]
+        public long? StreamIndex { get; set; }
     }
 
     /// <summary>
