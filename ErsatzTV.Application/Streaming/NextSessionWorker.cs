@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Globalization;
 using System.IO.Abstractions;
 using CliWrap;
 using ErsatzTV.Application.Playouts;
@@ -21,7 +23,13 @@ public class NextSessionWorker(
     ILogger<NextSessionWorker> logger)
     : IHlsSessionWorker
 {
+    private const int MaxPerformanceHistory = 25;
+
     private readonly TimeSpan _checkpointThreshold = TimeSpan.FromMinutes(5);
+    private readonly Lock _performanceSync = new();
+    private readonly LinkedList<(string ItemId, FFmpegTranscodePerformance Performance)> _performanceHistory = [];
+    private readonly ConcurrentDictionary<string, int?> _mediaItemIds = new(StringComparer.Ordinal);
+    private NextTranscode _currentTranscode;
 
     private readonly SemaphoreSlim _slim = new(1, 1);
     private CancellationTokenSource _cancellationTokenSource;
@@ -49,6 +57,11 @@ public class NextSessionWorker(
         {
             if (disposing)
             {
+                lock (_performanceSync)
+                {
+                    _currentTranscode?.Monitor.Dispose();
+                }
+
                 _serviceScope.Dispose();
                 _serviceScope = null;
             }
@@ -104,8 +117,179 @@ public class NextSessionWorker(
 
     public HlsSessionModel GetModel() => new(_channelNumber, "next", null, _lastTouch, _sessionStart);
 
-    public HlsSessionPerformanceModel GetPerformance() =>
-        HlsSessionPerformanceModel.NotSupported(_channelNumber, "next", _sessionStart);
+    public HlsSessionPerformanceModel GetPerformance()
+    {
+        lock (_performanceSync)
+        {
+            RefreshTranscode();
+
+            if (_currentTranscode is null && _performanceHistory.Count == 0)
+            {
+                return HlsSessionPerformanceModel.NotSupported(_channelNumber, "next", _sessionStart);
+            }
+
+            FFmpegTranscodePerformance current = null;
+            double? bufferSeconds = null;
+            if (_currentTranscode is not null)
+            {
+                current = WithMediaItem(_currentTranscode.ItemId, _currentTranscode.Monitor.GetPerformance());
+                foreach (DateTimeOffset until in _currentTranscode.Monitor.TranscodedUntil)
+                {
+                    bufferSeconds = (until - DateTimeOffset.Now).TotalSeconds;
+                }
+            }
+
+            return new HlsSessionPerformanceModel(
+                _channelNumber,
+                "next",
+                true,
+                _sessionStart,
+                bufferSeconds,
+                current,
+                _performanceHistory.Map(h => WithMediaItem(h.ItemId, h.Performance)).ToList());
+        }
+    }
+
+    private void RefreshTranscode()
+    {
+        if (string.IsNullOrWhiteSpace(_workingDirectory))
+        {
+            return;
+        }
+
+        string contents;
+        try
+        {
+            contents = fileSystem.File.ReadAllText(
+                fileSystem.Path.Combine(_workingDirectory, NextProgressReport.FileName));
+        }
+        catch (Exception)
+        {
+            // not published yet, or replaced while reading
+            return;
+        }
+
+        foreach (NextProgressReport report in NextProgressReport.Parse(contents))
+        {
+            if (_currentTranscode is null
+                || _currentTranscode.ItemId != report.ItemId
+                || _currentTranscode.StartedAt != report.StartedAt)
+            {
+                if (_currentTranscode is not null)
+                {
+                    FinishTranscode(_currentTranscode, succeeded: null);
+                }
+
+                var monitor = new FFmpegTranscodeMonitor(
+                    None,
+                    !report.IsRealtime,
+                    false,
+                    report.OutputStart,
+                    report.Arguments,
+                    report.StartedAt);
+                if (report.ProcessId is { } processId)
+                {
+                    monitor.AttachProcess(processId);
+                }
+
+                _currentTranscode = new NextTranscode(report.ItemId, report.StartedAt, monitor);
+                ResolveMediaItemId(report.ItemId);
+            }
+
+            if (report.Sequence > _currentTranscode.Sequence)
+            {
+                _currentTranscode.Sequence = report.Sequence;
+                foreach (string line in report.ProgressLines)
+                {
+                    _currentTranscode.Monitor.ParseLine(line);
+                }
+
+                if (report.IsEnded && !_currentTranscode.IsEnded)
+                {
+                    _currentTranscode.IsEnded = true;
+                    _currentTranscode.Monitor.Complete(true);
+                }
+            }
+        }
+    }
+
+    private void FinishTranscode(NextTranscode transcode, bool? succeeded)
+    {
+        if (!transcode.IsEnded)
+        {
+            transcode.Monitor.Complete(succeeded);
+        }
+
+        transcode.Monitor.Dispose();
+        _performanceHistory.AddFirst((transcode.ItemId, transcode.Monitor.GetPerformance()));
+        while (_performanceHistory.Count > MaxPerformanceHistory)
+        {
+            _performanceHistory.RemoveLast();
+        }
+    }
+
+    private FFmpegTranscodePerformance WithMediaItem(string itemId, FFmpegTranscodePerformance performance) =>
+        _mediaItemIds.TryGetValue(itemId, out int? mediaItemId) && mediaItemId is not null
+            ? performance with { MediaItemId = mediaItemId }
+            : performance;
+
+    private void ResolveMediaItemId(string itemId)
+    {
+        if (_mediaItemIds.Count > MaxPerformanceHistory * 4)
+        {
+            _mediaItemIds.Clear();
+        }
+
+        if (!_mediaItemIds.TryAdd(itemId, null))
+        {
+            return;
+        }
+
+        // unsaved-{start}-{mediaItemId}, e.g. fallback filler
+        if (itemId.StartsWith("unsaved-", StringComparison.Ordinal))
+        {
+            if (int.TryParse(
+                    itemId[(itemId.LastIndexOf('-') + 1)..],
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out int unsavedMediaItemId))
+            {
+                _mediaItemIds[itemId] = unsavedMediaItemId;
+            }
+
+            return;
+        }
+
+        if (!int.TryParse(itemId, NumberStyles.None, CultureInfo.InvariantCulture, out int playoutItemId))
+        {
+            return;
+        }
+
+        IMediator mediator = Mediator;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                foreach (int mediaItemId in await mediator.Send(new GetMediaItemIdByPlayoutItemId(playoutItemId)))
+                {
+                    _mediaItemIds[itemId] = mediaItemId;
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogDebug(ex, "Failed to find media item for playout item {PlayoutItemId}", playoutItemId);
+            }
+        });
+    }
+
+    private sealed class NextTranscode(string itemId, DateTimeOffset startedAt, FFmpegTranscodeMonitor monitor)
+    {
+        public string ItemId { get; } = itemId;
+        public DateTimeOffset StartedAt { get; } = startedAt;
+        public FFmpegTranscodeMonitor Monitor { get; } = monitor;
+        public long Sequence { get; set; }
+        public bool IsEnded { get; set; }
+    }
 
     public async Task Run(
         string channelNumber,

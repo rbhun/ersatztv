@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Dropped and duplicated frames reported by ffmpeg, with a note when source and output frame rates differ
   - Whether video decode and encode are actually using hardware acceleration, including GPU filters and software fallbacks
   - History of recent items per channel
+  - Channels using the ErsatzTV Next engine are included when the Next channel binary publishes ffmpeg progress
 
 ## [26.13.0] - 2026-11-20
 ### Changed

@@ -25,13 +25,14 @@ public sealed class FFmpegTranscodeMonitor : IDisposable
         bool isWorkingAhead,
         bool isSlug,
         DateTimeOffset outputStart,
-        string arguments)
+        string arguments,
+        DateTimeOffset? startedAt = null)
     {
         _mediaItemId = mediaItemId.MatchUnsafe(id => (int?)id, () => null);
         _isWorkingAhead = isWorkingAhead;
         _isSlug = isSlug;
         _outputStart = outputStart;
-        _startedAt = DateTimeOffset.Now;
+        _startedAt = startedAt ?? DateTimeOffset.Now;
         Acceleration = FFmpegAccelerationInfo.FromArguments(arguments);
     }
 
