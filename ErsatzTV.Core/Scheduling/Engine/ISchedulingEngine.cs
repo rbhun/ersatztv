@@ -13,6 +13,8 @@ public interface ISchedulingEngine
 
     ISchedulingEngine WithReferenceData(PlayoutReferenceData referenceData);
 
+    ISchedulingEngine WithEndCreditsTrim(EndCreditsTrim endCreditsTrim);
+
     ISchedulingEngine BuildBetween(DateTimeOffset start, DateTimeOffset finish);
 
     ISchedulingEngine RemoveBefore(DateTimeOffset removeBefore);

@@ -119,7 +119,10 @@ public class SequentialPlayoutBuilder(
         var context = new YamlPlayoutContext(playout, playoutDefinition, 1)
         {
             CurrentTime = start,
-            EndCreditsTrim = EndCreditsTrim.ForChannel(referenceData.Channel)
+            EndCreditsTrim = await EndCreditsTrim.ResolveAsync(
+                referenceData.Channel,
+                configElementRepository,
+                cancellationToken)
 
             // no need to init default value and throw off visited count
             // InstructionIndex = 0

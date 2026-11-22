@@ -124,4 +124,24 @@ public class MediaItemExtensionsTests
 
         ((int?)trim?.Keep.TotalSeconds).ShouldBe(expectedSeconds);
     }
+
+    [Test]
+    public void Trim_Should_Use_Global_When_Channel_Does_Not_Override()
+    {
+        var channel = new Channel(Guid.Empty) { SkipEndCredits = false, EndCreditsKeepSeconds = 0 };
+
+        EndCreditsTrim trim = EndCreditsTrim.Resolve(channel, globalSkip: true, globalKeepSeconds: 90);
+
+        ((int?)trim?.Keep.TotalSeconds).ShouldBe(90);
+    }
+
+    [Test]
+    public void Trim_Should_Prefer_Channel_Override_Over_Global()
+    {
+        var channel = new Channel(Guid.Empty) { SkipEndCredits = true, EndCreditsKeepSeconds = 30 };
+
+        EndCreditsTrim trim = EndCreditsTrim.Resolve(channel, globalSkip: true, globalKeepSeconds: 90);
+
+        ((int?)trim?.Keep.TotalSeconds).ShouldBe(30);
+    }
 }

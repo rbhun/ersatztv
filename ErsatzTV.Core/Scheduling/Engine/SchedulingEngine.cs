@@ -30,6 +30,7 @@ public class SchedulingEngine(
     private readonly Dictionary<string, ImmutableList<MediaItem>> _enumeratorMediaItems = new();
     private readonly SchedulingEngineState _state = new(0);
     private PlayoutReferenceData _referenceData;
+    private EndCreditsTrim _endCreditsTrim;
 
     public ISchedulingEngine WithPlayoutId(int playoutId)
     {
@@ -52,6 +53,12 @@ public class SchedulingEngine(
     public ISchedulingEngine WithReferenceData(PlayoutReferenceData referenceData)
     {
         _referenceData = referenceData;
+        return this;
+    }
+
+    public ISchedulingEngine WithEndCreditsTrim(EndCreditsTrim endCreditsTrim)
+    {
+        _endCreditsTrim = endCreditsTrim;
         return this;
     }
 
@@ -1494,8 +1501,10 @@ public class SchedulingEngine(
     }
 
     private EndCreditsTrim EndCreditsTrimFor(FillerKind fillerKind) =>
-        fillerKind is FillerKind.None && _referenceData?.Channel is { } channel
-            ? EndCreditsTrim.ForChannel(channel)
+        fillerKind is FillerKind.None
+            ? _endCreditsTrim ?? (_referenceData?.Channel is { } channel
+                ? EndCreditsTrim.ForChannel(channel)
+                : null)
             : null;
 
     private async Task<Option<GraphicsElement>> GetGraphicsElementByPath(

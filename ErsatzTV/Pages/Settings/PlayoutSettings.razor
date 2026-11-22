@@ -33,6 +33,28 @@
                 </div>
                 <MudTextField @bind-Value="_playoutSettings.ScriptedScheduleTimeoutSeconds" Validation="@(new Func<int, string>(ValidateScriptedScheduleTimeoutSeconds))" Required="true" RequiredError="Scripted schedule timeout is required!" Adornment="Adornment.End" AdornmentText="seconds"/>
             </MudStack>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <div class="d-flex">
+                    <MudText>Skip End Credits</MudText>
+                </div>
+                <MudCheckBox @bind-Value="_playoutSettings.SkipEndCredits" Dense="true">
+                    <MudText Typo="Typo.caption" Style="font-weight: normal">
+                        End programs where Plex detected final credits (applies to all channels; individual channels can still override under Channels). Takes effect on the next playout build.
+                    </MudText>
+                </MudCheckBox>
+            </MudStack>
+            <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
+                <div class="d-flex">
+                    <MudText>Keep End Credits</MudText>
+                </div>
+                <MudTextField T="int"
+                              @bind-Value="_playoutSettings.EndCreditsKeepSeconds"
+                              Validation="@(new Func<int, string>(ValidateEndCreditsKeepSeconds))"
+                              Disabled="@(!_playoutSettings.SkipEndCredits)"
+                              Adornment="Adornment.End"
+                              AdornmentText="seconds"
+                              HelperText="How much of the final credits to play before cutting to the next item"/>
+            </MudStack>
         </MudContainer>
     </div>
 </MudForm>
@@ -71,6 +93,9 @@
     private static string ValidatePlayoutDaysToBuild(int daysToBuild) => daysToBuild <= 0 ? "Playout days to build must be greater than zero" : null;
 
     private static string ValidateScriptedScheduleTimeoutSeconds(int seconds) => seconds < 10 ? "Scripted schedule timeout seconds must be at least 10" : null;
+
+    private static string ValidateEndCreditsKeepSeconds(int seconds) =>
+        seconds is < 0 or > 3600 ? "Keep end credits must be between 0 and 3600 seconds" : null;
 
     private async Task SavePlayoutSettings()
     {

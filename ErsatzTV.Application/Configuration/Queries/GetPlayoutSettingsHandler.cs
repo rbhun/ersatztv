@@ -24,11 +24,21 @@ public class GetPlayoutSettingsHandler : IRequestHandler<GetPlayoutSettings, Pla
                 ConfigElementKey.PlayoutScriptedScheduleTimeoutSeconds,
                 cancellationToken);
 
+        Option<bool> skipEndCredits =
+            await _configElementRepository.GetValue<bool>(ConfigElementKey.PlayoutSkipEndCredits, cancellationToken);
+
+        Option<int> endCreditsKeepSeconds =
+            await _configElementRepository.GetValue<int>(
+                ConfigElementKey.PlayoutEndCreditsKeepSeconds,
+                cancellationToken);
+
         return new PlayoutSettingsViewModel
         {
             DaysToBuild = await daysToBuild.IfNoneAsync(2),
             SkipMissingItems = await skipMissingItems.IfNoneAsync(false),
-            ScriptedScheduleTimeoutSeconds = await scriptedScheduleTimeoutSeconds.IfNoneAsync(30)
+            ScriptedScheduleTimeoutSeconds = await scriptedScheduleTimeoutSeconds.IfNoneAsync(30),
+            SkipEndCredits = await skipEndCredits.IfNoneAsync(false),
+            EndCreditsKeepSeconds = await endCreditsKeepSeconds.IfNoneAsync(0)
         };
     }
 }

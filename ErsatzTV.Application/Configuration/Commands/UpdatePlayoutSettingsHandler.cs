@@ -58,6 +58,16 @@ public class UpdatePlayoutSettingsHandler : IRequestHandler<UpdatePlayoutSetting
             playoutSettings.ScriptedScheduleTimeoutSeconds,
             cancellationToken);
 
+        await _configElementRepository.Upsert(
+            ConfigElementKey.PlayoutSkipEndCredits,
+            playoutSettings.SkipEndCredits,
+            cancellationToken);
+
+        await _configElementRepository.Upsert(
+            ConfigElementKey.PlayoutEndCreditsKeepSeconds,
+            playoutSettings.EndCreditsKeepSeconds,
+            cancellationToken);
+
         // continue all playouts to proper number of days
         List<Playout> playouts = await dbContext.Playouts
             .Include(p => p.Channel)
@@ -71,10 +81,18 @@ public class UpdatePlayoutSettingsHandler : IRequestHandler<UpdatePlayoutSetting
         return Unit.Default;
     }
 
-    private static Task<Validation<BaseError, Unit>> Validate(UpdatePlayoutSettings request) =>
-        Optional(request.PlayoutSettings.DaysToBuild)
-            .Where(days => days > 0)
-            .Map(_ => Unit.Default)
-            .ToValidation<BaseError>("Days to build must be greater than zero")
-            .AsTask();
+    private static Task<Validation<BaseError, Unit>> Validate(UpdatePlayoutSettings request)
+    {
+        if (request.PlayoutSettings.DaysToBuild <= 0)
+        {
+            return Task.FromResult(Fail<BaseError, Unit>("Days to build must be greater than zero"));
+        }
+
+        if (request.PlayoutSettings.EndCreditsKeepSeconds is < 0 or > 3600)
+        {
+            return Task.FromResult(Fail<BaseError, Unit>("Keep end credits must be between 0 and 3600 seconds"));
+        }
+
+        return Task.FromResult(Success<BaseError, Unit>(Unit.Default));
+    }
 }

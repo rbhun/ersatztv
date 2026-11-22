@@ -52,6 +52,8 @@ public class ConfigElementKey
     public static ConfigElementKey LibraryRefreshInterval => new("scanner.library_refresh_interval");
     public static ConfigElementKey PlayoutDaysToBuild => new("playout.days_to_build");
     public static ConfigElementKey PlayoutSkipMissingItems => new("playout.skip_missing_items");
+    public static ConfigElementKey PlayoutSkipEndCredits => new("playout.skip_end_credits");
+    public static ConfigElementKey PlayoutEndCreditsKeepSeconds => new("playout.end_credits_keep_seconds");
 
     public static ConfigElementKey TroubleshootingBlockPlayoutHistoryPageSize =>
         new("pages.troubleshooting.block_playout_history.page_size");

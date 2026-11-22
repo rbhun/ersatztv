@@ -76,6 +76,8 @@ public class ScriptedPlayoutBuilder(
             schedulingEngine.WithSeed(playout.Seed);
             schedulingEngine.BuildBetween(start, finish);
             schedulingEngine.WithReferenceData(referenceData);
+            schedulingEngine.WithEndCreditsTrim(
+                await EndCreditsTrim.ResolveAsync(referenceData.Channel, configElementRepository, cancellationToken));
 
             schedulingEngine.RestoreOrReset(Optional(playout.Anchor));
 

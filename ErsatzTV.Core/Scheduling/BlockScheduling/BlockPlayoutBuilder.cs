@@ -51,7 +51,10 @@ public class BlockPlayoutBuilder(
             referenceData.Channel.Number,
             referenceData.Channel.Name);
 
-        EndCreditsTrim endCreditsTrim = EndCreditsTrim.ForChannel(referenceData.Channel);
+        EndCreditsTrim endCreditsTrim = await EndCreditsTrim.ResolveAsync(
+            referenceData.Channel,
+            configElementRepository,
+            cancellationToken);
 
         List<PlaybackOrder> allowedPlaybackOrders =
         [

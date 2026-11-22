@@ -759,7 +759,10 @@ public class PlayoutBuilder : IPlayoutBuilder
             startAnchor.NextGuideGroup,
             currentTime)
         {
-            EndCreditsTrim = EndCreditsTrim.ForChannel(referenceData.Channel)
+            EndCreditsTrim = await EndCreditsTrim.ResolveAsync(
+                referenceData.Channel,
+                _configElementRepository,
+                cancellationToken)
         };
 
         var schedulerOne = new PlayoutModeSchedulerOne(_logger);

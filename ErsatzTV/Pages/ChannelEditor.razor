@@ -282,7 +282,7 @@ else
     <MudCheckBox @bind-Value="_model.SkipEndCredits"
                  For="@(() => _model.SkipEndCredits)"
                  Dense="true"
-                 Label="End programs where Plex detected final credits; takes effect on the next playout build"/>
+                 Label="Override Settings → Playout for this channel; end programs where Plex detected final credits"/>
 </MudStack>
 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
     <div class="d-flex">
@@ -294,7 +294,7 @@ else
                   Disabled="@(!_model.SkipEndCredits)"
                   Adornment="Adornment.End"
                   AdornmentText="seconds"
-                  HelperText="How much of the final credits to play before cutting to the next item"/>
+                  HelperText="Channel override: how much of the final credits to play before cutting to the next item"/>
 </MudStack>
 <MudStack Row="true" Breakpoint="Breakpoint.SmAndDown" Class="form-field-stack gap-md-8 mb-5">
     <div class="d-flex">
