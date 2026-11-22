@@ -35,6 +35,7 @@ using ErsatzTV.Core.Interfaces.Search;
 using ErsatzTV.Core.Interfaces.Streaming;
 using ErsatzTV.Core.Interfaces.Trakt;
 using ErsatzTV.Core.Interfaces.Troubleshooting;
+using ErsatzTV.Core.Interfaces.Updates;
 using ErsatzTV.Core.Jellyfin;
 using ErsatzTV.Core.Metadata;
 using ErsatzTV.Core.Plex;
@@ -74,6 +75,7 @@ using ErsatzTV.Infrastructure.Sqlite.Data;
 using ErsatzTV.Infrastructure.Streaming;
 using ErsatzTV.Infrastructure.Streaming.Graphics;
 using ErsatzTV.Infrastructure.Trakt;
+using ErsatzTV.Infrastructure.Updates;
 using ErsatzTV.Infrastructure.Troubleshooting;
 using ErsatzTV.Security;
 using ErsatzTV.Serialization;
@@ -486,6 +488,7 @@ public class Startup
         services.AddHttpClient(
             TroubleshootingUploadClient.HttpClientName,
             client => client.Timeout = TimeSpan.FromMinutes(10));
+        services.AddHttpClient("UpdateAgent");
 
         services.Configure<TraktConfiguration>(Configuration.GetSection("Trakt"));
 
@@ -926,6 +929,7 @@ public class Startup
         services.AddScoped<ISongVideoGenerator, SongVideoGenerator>();
         services.AddScoped<IMusicVideoCreditsGenerator, MusicVideoCreditsGenerator>();
         services.AddScoped<IGitHubApiClient, GitHubApiClient>();
+        services.AddScoped<IUpdateAgentClient, UpdateAgentClient>();
         services.AddScoped<IHtmlSanitizer, HtmlSanitizer>(_ =>
         {
             var sanitizer = new HtmlSanitizer();

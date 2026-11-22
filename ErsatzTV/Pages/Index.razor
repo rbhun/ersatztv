@@ -5,9 +5,12 @@
 @using System.Reflection
 @using System.Text.RegularExpressions
 @using ErsatzTV.Core.Interfaces.GitHub
+@using ErsatzTV.Core.Interfaces.Updates
+@using ErsatzTV.Core.Updates
 @using Microsoft.Extensions.Caching.Memory
 @implements IDisposable
 @inject IGitHubApiClient GitHubApiClient
+@inject IUpdateAgentClient UpdateAgentClient
 @inject IMemoryCache MemoryCache
 @inject IMediator Mediator
 @inject SystemStartup SystemStartup;
@@ -138,6 +141,71 @@
                         </MudTd>
                     </RowTemplate>
                 </MudTable>
+
+                <MudPaper Class="mt-6 pa-4" Outlined="true">
+                    <MudText Typo="Typo.h6" Class="mb-2">Updates</MudText>
+                    @if (!UpdateAgentClient.IsConfigured)
+                    {
+                        <MudText Typo="Typo.body2" Color="Color.Secondary">
+                            Update agent is not configured. On the host, set
+                            <code>UPDATE_AGENT_TOKEN</code> in <code>/opt/ersatztv/local/env</code>,
+                            enable <code>ersatztv-update-agent</code>, and redeploy compose so
+                            <code>ETV_UPDATE_AGENT_URL</code> reaches the container.
+                        </MudText>
+                    }
+                    else
+                    {
+                        <div class="d-flex flex-wrap align-center gap-3 mb-3">
+                            <MudSelect T="string"
+                                       Label="Repository"
+                                       Dense="true"
+                                       Style="min-width: 18rem"
+                                       Value="_selectedSourceId"
+                                       ValueChanged="OnSourceChanged"
+                                       Disabled="@(_sources.Count == 0 || _updating)">
+                                @foreach (UpdateSource source in _sources)
+                                {
+                                    <MudSelectItem Value="@source.Id">@source.Label (@source.Branch)</MudSelectItem>
+                                }
+                            </MudSelect>
+                            <MudChip T="string"
+                                     Color="@UpdateChipColor()"
+                                     Variant="Variant.Filled"
+                                     Size="Size.Small">
+                                @_updateStatusText
+                            </MudChip>
+                            <MudButton Variant="Variant.Filled"
+                                       Color="Color.Primary"
+                                       Disabled="@(!CanUpdate())"
+                                       OnClick="StartUpdate">
+                                @(_updating ? "Updating…" : "Update")
+                            </MudButton>
+                        </div>
+                        @if (!string.IsNullOrWhiteSpace(_installedVersion))
+                        {
+                            <MudText Typo="Typo.caption" Class="mb-2">
+                                Installed: @_installedVersion
+                                @if (!string.IsNullOrWhiteSpace(_localSha))
+                                {
+                                    <span> · local @_localSha[..Math.Min(8, _localSha.Length)]</span>
+                                }
+                                @if (!string.IsNullOrWhiteSpace(_remoteSha))
+                                {
+                                    <span> · remote @_remoteSha[..Math.Min(8, _remoteSha.Length)]</span>
+                                }
+                            </MudText>
+                        }
+                        @if (!string.IsNullOrWhiteSpace(_updateError))
+                        {
+                            <MudAlert Severity="Severity.Error" Dense="true" Class="mb-2">@_updateError</MudAlert>
+                        }
+                        <MudText Typo="Typo.caption" Class="mb-1">Update log</MudText>
+                        <MudPaper Class="pa-2" Style="background: var(--mud-palette-background-grey); max-height: 12rem; overflow: auto; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.75rem; white-space: pre-wrap;">
+                            @(_updateLog.Length == 0 ? "(no log yet)" : _updateLog)
+                        </MudPaper>
+                    }
+                </MudPaper>
+
                 <MudCard Class="mt-6">
                     <MudCardHeader>
                         <MudText Class="mt-6">Full changelog is available on <MudLink Href="https://github.com/ErsatzTV/legacy/blob/main/CHANGELOG.md" Target="_blank">GitHub</MudLink></MudText>
@@ -160,6 +228,19 @@
 
     private string _releaseNotes;
 
+    private readonly List<UpdateSource> _sources = [];
+    private string _selectedSourceId;
+    private string _updateStatusText = "Checking…";
+    private string _updateError;
+    private string _updateLog = string.Empty;
+    private string _installedVersion;
+    private string _localSha;
+    private string _remoteSha;
+    private bool _updateAvailable;
+    private bool _updating;
+    private bool _updatePollStarted;
+    private CancellationTokenSource _updateCts;
+
     protected override void OnInitialized()
     {
         SystemStartup.OnDatabaseReady += OnStartupProgress;
@@ -173,6 +254,8 @@
 
         _cts?.Cancel();
         _cts?.Dispose();
+        _updateCts?.Cancel();
+        _updateCts?.Dispose();
     }
 
     private async void OnStartupProgress(object sender, EventArgs e)
@@ -185,6 +268,23 @@
         {
             // do nothing
         }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || _updatePollStarted || !SystemStartup.IsDatabaseReady || !SystemStartup.IsSearchIndexReady)
+        {
+            return;
+        }
+
+        _updatePollStarted = true;
+        if (!UpdateAgentClient.IsConfigured)
+        {
+            return;
+        }
+
+        _updateCts = new CancellationTokenSource();
+        _ = PollUpdates(_updateCts.Token);
     }
 
     protected override async Task OnParametersSetAsync()
@@ -257,6 +357,154 @@
         {
             // ignore
         }
+    }
+
+    private async Task PollUpdates(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await LoadSources(cancellationToken);
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(10));
+            do
+            {
+                await RefreshUpdateState(cancellationToken);
+                await InvokeAsync(StateHasChanged);
+            } while (await timer.WaitForNextTickAsync(cancellationToken));
+        }
+        catch (OperationCanceledException)
+        {
+            // page disposed
+        }
+        catch (Exception ex)
+        {
+            _updateError = ex.Message;
+            _updateStatusText = "Agent error";
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task LoadSources(CancellationToken cancellationToken)
+    {
+        Either<BaseError, UpdateSourcesResponse> result = await UpdateAgentClient.GetSources(cancellationToken);
+        foreach (BaseError error in result.LeftToSeq())
+        {
+            _updateError = error.Value;
+            _updateStatusText = "Agent unavailable";
+        }
+
+        foreach (UpdateSourcesResponse response in result.RightToSeq())
+        {
+            _sources.Clear();
+            _sources.AddRange(response.Sources ?? []);
+            if (string.IsNullOrWhiteSpace(_selectedSourceId) && _sources.Count > 0)
+            {
+                _selectedSourceId = _sources[0].Id;
+            }
+        }
+    }
+
+    private async Task RefreshUpdateState(CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(_selectedSourceId))
+        {
+            return;
+        }
+
+        Either<BaseError, UpdateStatusResponse> statusResult = await UpdateAgentClient.GetStatus(cancellationToken);
+        foreach (UpdateStatusResponse status in statusResult.RightToSeq())
+        {
+            _updating = status.Updating;
+            _installedVersion = status.InstalledVersion;
+            if (!string.IsNullOrWhiteSpace(status.LastError) && status.LastOk == false)
+            {
+                _updateError = status.LastError;
+            }
+        }
+
+        Either<BaseError, UpdateCheckResponse> checkResult =
+            await UpdateAgentClient.Check(_selectedSourceId, cancellationToken);
+        foreach (BaseError error in checkResult.LeftToSeq())
+        {
+            _updateError = error.Value;
+            _updateStatusText = _updating ? "Updating…" : "Check failed";
+        }
+
+        foreach (UpdateCheckResponse check in checkResult.RightToSeq())
+        {
+            _updateError = null;
+            _updateAvailable = check.UpdateAvailable;
+            _localSha = check.LocalSha;
+            _remoteSha = check.RemoteSha;
+            _installedVersion = check.InstalledVersion ?? _installedVersion;
+            _updateStatusText = _updating
+                ? "Updating…"
+                : _updateAvailable
+                    ? "Update available"
+                    : "Up to date";
+        }
+
+        Either<BaseError, string> logResult = await UpdateAgentClient.GetLog(cancellationToken);
+        foreach (string log in logResult.RightToSeq())
+        {
+            _updateLog = log ?? string.Empty;
+        }
+    }
+
+    private async Task OnSourceChanged(string sourceId)
+    {
+        _selectedSourceId = sourceId;
+        if (_updateCts is { IsCancellationRequested: false })
+        {
+            await RefreshUpdateState(_updateCts.Token);
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task StartUpdate()
+    {
+        if (!CanUpdate())
+        {
+            return;
+        }
+
+        _updating = true;
+        _updateStatusText = "Updating…";
+        _updateError = null;
+        Either<BaseError, UpdateStartResponse> result =
+            await UpdateAgentClient.StartUpdate(_selectedSourceId, CancellationToken.None);
+        foreach (BaseError error in result.LeftToSeq())
+        {
+            _updating = false;
+            _updateError = error.Value;
+            _updateStatusText = "Update failed to start";
+        }
+
+        Either<BaseError, string> logResult = await UpdateAgentClient.GetLog(CancellationToken.None);
+        foreach (string log in logResult.RightToSeq())
+        {
+            _updateLog = log ?? string.Empty;
+        }
+    }
+
+    private bool CanUpdate() =>
+        UpdateAgentClient.IsConfigured
+        && !_updating
+        && _updateAvailable
+        && !string.IsNullOrWhiteSpace(_selectedSourceId);
+
+    private Color UpdateChipColor()
+    {
+        if (_updating)
+        {
+            return Color.Info;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_updateError))
+        {
+            return Color.Error;
+        }
+
+        return _updateAvailable ? Color.Warning : Color.Success;
     }
 
     private async Task RefreshHealthChecks()
