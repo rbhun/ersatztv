@@ -66,11 +66,15 @@ public class UpdateAgentClient(IHttpClientFactory httpClientFactory, ILogger<Upd
         try
         {
             using HttpClient client = CreateClient();
-            using HttpResponseMessage response = await client.PostAsJsonAsync(
-                "/v1/update",
-                new { source = sourceId },
-                JsonOptions,
-                cancellationToken);
+            // Put source in the query string and JSON body. The host agent's
+            // BaseHTTPRequestHandler often misses chunked POST bodies.
+            string path = $"/v1/update?source={Uri.EscapeDataString(sourceId)}";
+            var payload = new Dictionary<string, string> { ["source"] = sourceId };
+            using var content = new StringContent(
+                JsonSerializer.Serialize(payload, JsonOptions),
+                System.Text.Encoding.UTF8,
+                "application/json");
+            using HttpResponseMessage response = await client.PostAsync(path, content, cancellationToken);
             string body = await response.Content.ReadAsStringAsync(cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
